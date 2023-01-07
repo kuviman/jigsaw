@@ -31,7 +31,7 @@ impl Jigsaw {
                 .map(|(i, mesh)| {
                     let puzzle_pos = vec2(i % pieces.x, i / pieces.x);
                     JigsawTile {
-                        pos: puzzle_pos.map(|x| x as f32) * tile_size,
+                        pos: puzzle_pos.map(|x| x as f32 + 0.5) * tile_size,
                         grabbed_by: None,
                         puzzle_pos,
                         mesh,

@@ -43,13 +43,18 @@ impl Game {
             camera: Camera2d {
                 center: Vec2::ZERO,
                 rotation: 0.0,
-                fov: 30.0,
+                fov: 10.0,
             },
             framebuffer_size: vec2(1, 1),
             jigsaw: {
                 let size = assets.puzzle.size().map(|x| x as f32);
-                let size = size * 10.0 / size.y;
-                Jigsaw::generate(geng.ugli(), size, size.map(|x| x.floor() as usize))
+                let size = size * 5.0 / size.y;
+                let mut jigsaw =
+                    Jigsaw::generate(geng.ugli(), size, size.map(|x| x.floor() as usize));
+                for tile in &mut jigsaw.tiles {
+                    tile.pos -= size / 2.0;
+                }
+                jigsaw
             },
         }
     }
