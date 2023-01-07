@@ -4,6 +4,8 @@ use crate::jigsaw::Jigsaw;
 
 use super::*;
 
+const SNAP_DISTANCE: f32 = 0.2;
+
 type Connection = geng::net::client::Connection<ServerMessage, ClientMessage>;
 
 #[derive(HasId)]
@@ -88,6 +90,24 @@ impl Game {
                     self.players.get_mut(&player).unwrap().tile_grabbed = None;
                     self.jigsaw.tiles[tile].grabbed_by = None;
                 }
+                ServerMessage::ConnectTiles(a, b) => {
+                    self.jigsaw.tiles[a].connected_to.push(b);
+                    self.jigsaw.tiles[b].connected_to.push(a);
+                    let delta = self.jigsaw.tiles[a].puzzle_pos.map(|x| x as i32)
+                        - self.jigsaw.tiles[b].puzzle_pos.map(|x| x as i32);
+                    let pos = if delta.x == 0 && delta.y.abs() == 1 {
+                        // Tile is adjacent vertically
+                        self.jigsaw.tiles[b].pos
+                            + vec2(0.0, self.jigsaw.tile_size.y * delta.y.signum() as f32)
+                    } else if delta.y == 0 && delta.x.abs() == 1 {
+                        // Tile is adjacent horizontally
+                        self.jigsaw.tiles[b].pos
+                            + vec2(self.jigsaw.tile_size.x * delta.x.signum() as f32, 0.0)
+                    } else {
+                        unreachable!()
+                    };
+                    self.move_tile(a, pos);
+                }
             }
         }
     }
@@ -102,9 +122,51 @@ impl Game {
     }
     fn release(&mut self) {
         let player = self.players.get_mut(&self.id).unwrap();
-        if let Some(tile) = player.tile_grabbed.take() {
-            self.jigsaw.tiles.get_mut(tile).unwrap().grabbed_by = None;
-            self.connection.send(ClientMessage::ReleaseTile(tile));
+        if let Some(tile_id) = player.tile_grabbed.take() {
+            self.connection.send(ClientMessage::ReleaseTile(tile_id));
+            let tile = self.jigsaw.tiles.get_mut(tile_id).unwrap();
+            tile.grabbed_by = None;
+
+            // Try to connect
+            let tile = self.jigsaw.tiles.get(tile_id).unwrap();
+            let pos = tile.pos;
+            let puzzle_pos = tile.puzzle_pos;
+            for (i, other) in self.jigsaw.tiles.iter().enumerate() {
+                if tile.connected_to.contains(&i) {
+                    continue;
+                }
+                let delta = puzzle_pos.map(|x| x as i32) - other.puzzle_pos.map(|x| x as i32);
+                let delta = if delta.x == 0 && delta.y.abs() == 1 {
+                    // Tile is adjacent vertically
+                    Some(
+                        pos - other.pos
+                            - vec2(0.0, self.jigsaw.tile_size.y * delta.y.signum() as f32),
+                    )
+                } else if delta.y == 0 && delta.x.abs() == 1 {
+                    // Tile is adjacent horizontally
+                    Some(
+                        pos - other.pos
+                            - vec2(self.jigsaw.tile_size.x * delta.x.signum() as f32, 0.0),
+                    )
+                } else {
+                    None
+                };
+                if let Some(delta) = delta {
+                    // Delta to the snap position
+                    if delta.len() <= SNAP_DISTANCE {
+                        self.connection
+                            .send(ClientMessage::ConnectTiles(tile_id, i));
+                    }
+                }
+            }
+        }
+    }
+    fn move_tile(&mut self, tile: usize, pos: Vec2<f32>) {
+        let tiles = self.jigsaw.get_all_connected(tile);
+        let start_pos = self.jigsaw.tiles[tile].puzzle_pos.map(|x| x as i32);
+        for tile in tiles {
+            let delta = self.jigsaw.tiles[tile].puzzle_pos.map(|x| x as i32) - start_pos;
+            self.jigsaw.tiles[tile].pos = pos + delta.map(|x| x as f32) * self.jigsaw.tile_size;
         }
     }
 }
@@ -113,32 +175,36 @@ impl geng::State for Game {
     fn update(&mut self, delta_time: f64) {
         let delta_time = delta_time as f32;
         self.handle_connection();
+        let mut moves = Vec::new();
         for player in &mut self.players {
             player.interpolation.update(delta_time);
 
             // Update grabbed tile
-            if let Some(tile) = player.tile_grabbed {
-                if let Some(tile) = self.jigsaw.tiles.get_mut(tile) {
+            if let Some(tile_id) = player.tile_grabbed {
+                if let Some(tile) = self.jigsaw.tiles.get_mut(tile_id) {
                     if tile.grabbed_by != Some(player.id) {
                         player.tile_grabbed = None;
                     } else {
-                        tile.pos = player.interpolation.get();
+                        moves.push((tile_id, player.interpolation.get()));
                     }
                 }
             }
+        }
+        for (tile, pos) in moves {
+            self.move_tile(tile, pos);
         }
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
         ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
 
-        for piece in &self.jigsaw.tiles {
-            let matrix = piece.matrix();
+        for tile in &self.jigsaw.tiles {
+            let matrix = tile.matrix();
             ugli::draw(
                 framebuffer,
                 &self.assets.shaders.jigsaw,
                 ugli::DrawMode::Triangles,
-                &piece.mesh,
+                &tile.mesh,
                 (
                     ugli::uniforms! {
                         u_model_matrix: matrix,
@@ -147,7 +213,7 @@ impl geng::State for Game {
                     geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
                 ),
                 ugli::DrawParameters::default(),
-            )
+            );
         }
 
         for player in &self.players {

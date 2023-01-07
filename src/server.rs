@@ -104,6 +104,14 @@ impl State {
                     }
                 }
             }
+            ClientMessage::ConnectTiles(a, b) => {
+                // TODO: check validity
+                for player in &mut self.players {
+                    if player.room == room {
+                        player.sender.send(ServerMessage::ConnectTiles(a, b));
+                    }
+                }
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ pub enum ServerMessage {
     UpdatePos(Id, Vec2<f32>),
     TileGrabbed { player: Id, tile: usize },
     TileReleased { player: Id, tile: usize },
+    ConnectTiles(usize, usize),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,4 +19,5 @@ pub enum ClientMessage {
     UpdatePos(Vec2<f32>),
     GrabTile(usize),
     ReleaseTile(usize),
+    ConnectTiles(usize, usize),
 }

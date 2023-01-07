@@ -11,12 +11,14 @@ pub struct JigsawVertex {
 }
 
 pub struct Jigsaw {
+    pub tile_size: Vec2<f32>,
     pub tiles: Vec<JigsawTile>,
 }
 
 pub struct JigsawTile {
     pub pos: Vec2<f32>,
     pub grabbed_by: Option<Id>,
+    pub connected_to: Vec<usize>,
     pub puzzle_pos: Vec2<usize>,
     pub mesh: JigsawMesh,
 }
@@ -25,6 +27,7 @@ impl Jigsaw {
     pub fn generate(ugli: &Ugli, size: Vec2<f32>, pieces: Vec2<usize>) -> Self {
         let tile_size = size / pieces.map(|x| x as f32);
         Self {
+            tile_size,
             tiles: gen::generate_jigsaw(ugli, size, pieces)
                 .into_iter()
                 .enumerate()
@@ -33,12 +36,28 @@ impl Jigsaw {
                     JigsawTile {
                         pos: puzzle_pos.map(|x| x as f32 + 0.5) * tile_size,
                         grabbed_by: None,
+                        connected_to: vec![],
                         puzzle_pos,
                         mesh,
                     }
                 })
                 .collect(),
         }
+    }
+
+    pub fn get_all_connected(&self, tile: usize) -> HashSet<usize> {
+        fn walk_rec(tiles: &[jigsaw::JigsawTile], tile: usize, checked: &mut HashSet<usize>) {
+            if !checked.insert(tile) {
+                return;
+            }
+            for &tile in &tiles[tile].connected_to {
+                walk_rec(tiles, tile, checked);
+            }
+        }
+
+        let mut connected = HashSet::new();
+        walk_rec(&self.tiles, tile, &mut connected);
+        connected
     }
 }
 
