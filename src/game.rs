@@ -12,16 +12,24 @@ struct Game {
     geng: Geng,
     assets: Rc<Assets>,
     id: Id,
+    room: String,
     connection: Connection,
     players: Collection<Player>,
 }
 
 impl Game {
-    pub fn new(geng: &Geng, assets: &Rc<Assets>, id: Id, connection: Connection) -> Self {
+    pub fn new(
+        geng: &Geng,
+        assets: &Rc<Assets>,
+        id: Id,
+        room: String,
+        connection: Connection,
+    ) -> Self {
         Self {
             geng: geng.clone(),
             assets: assets.clone(),
             id,
+            room,
             connection,
             players: Collection::new(),
         }
@@ -38,7 +46,7 @@ impl Game {
     fn handle_connection(&mut self) {
         while let Some(message) = self.connection.try_recv() {
             match message {
-                ServerMessage::SetupId(_) => unreachable!(),
+                ServerMessage::SetupId(..) => unreachable!(),
                 ServerMessage::UpdatePos(id, pos) => {
                     self.get_player(id)
                         .interpolation
@@ -81,7 +89,7 @@ impl geng::State for Game {
     }
 }
 
-pub fn run(addr: &str) {
+pub fn run(addr: &str, room: Option<String>) {
     let geng = Geng::new_with(geng::ContextOptions {
         title: "LD 52".to_owned(),
         ..default()
@@ -94,10 +102,11 @@ pub fn run(addr: &str) {
                 .await
                 .expect("Failed to load assets");
             let mut connection: game::Connection = connection.await;
-            let Some(ServerMessage::SetupId(id)) = connection.next().await else {
+            connection.send(ClientMessage::SelectRoom(room));
+            let Some(ServerMessage::SetupId(id, room)) = connection.next().await else {
                 panic!()
             };
-            game::Game::new(&geng, &assets, id, connection)
+            game::Game::new(&geng, &assets, id, room, connection)
         }
     };
     geng::run(

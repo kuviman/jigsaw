@@ -5,12 +5,13 @@ pub struct Id(pub u64);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServerMessage {
-    SetupId(Id),
+    SetupId(Id, String),
     PlayerDisconnected(Id),
     UpdatePos(Id, Vec2<f32>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientMessage {
+    SelectRoom(Option<String>),
     UpdatePos(Vec2<f32>),
 }

@@ -19,7 +19,16 @@ impl IdGen {
 #[derive(HasId)]
 struct Player {
     id: Id,
+    room: String,
     sender: Box<dyn geng::net::Sender<ServerMessage>>,
+}
+
+fn create_room() -> String {
+    rand::distributions::DistString::sample_string(
+        &rand::distributions::Alphanumeric,
+        &mut thread_rng(),
+        16,
+    )
 }
 
 struct State {
@@ -35,13 +44,21 @@ impl State {
         }
     }
     fn handle(&mut self, id: Id, message: ClientMessage) {
+        let room = self.players.get(&id).unwrap().room.clone();
         match message {
             ClientMessage::UpdatePos(pos) => {
                 for player in &mut self.players {
-                    if player.id != id {
+                    if player.id != id && player.room == room {
                         player.sender.send(ServerMessage::UpdatePos(id, pos));
                     }
                 }
+            }
+            ClientMessage::SelectRoom(room) => {
+                let player = self.players.get_mut(&id).unwrap();
+                player.room = room.unwrap_or_else(create_room);
+                player
+                    .sender
+                    .send(ServerMessage::SetupId(id, player.room.clone()));
             }
         }
     }
@@ -66,8 +83,11 @@ impl geng::net::server::App for App {
     fn connect(&mut self, sender: Box<dyn geng::net::Sender<ServerMessage>>) -> Client {
         let mut state = self.state.lock().unwrap();
         let id = state.id_gen.gen();
-        let mut player = Player { id, sender };
-        player.sender.send(ServerMessage::SetupId(id));
+        let mut player = Player {
+            id,
+            room: create_room(),
+            sender,
+        };
         state.players.insert(player);
         Client {
             id,

@@ -17,6 +17,8 @@ struct Opt {
     pub server: Option<String>,
     #[clap(long)]
     pub connect: Option<String>,
+    #[clap(long)]
+    pub room: Option<String>,
 }
 
 fn main() {
@@ -53,7 +55,7 @@ fn main() {
             None
         };
 
-        game::run(opt.connect.as_deref().unwrap());
+        game::run(opt.connect.as_deref().unwrap(), opt.room.clone());
 
         #[cfg(not(target_arch = "wasm32"))]
         if let Some((server_handle, server_thread)) = server {
