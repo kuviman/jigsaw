@@ -3,7 +3,7 @@ use super::*;
 type Mesh = Vec<[JigsawVertex; 3]>;
 
 pub fn generate_jigsaw(ugli: &Ugli, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<JigsawMesh> {
-    finalize_meshes(ugli, scale(size, triangulate(pieces, jigsaw(pieces))))
+    finalize_meshes(ugli, triangulate(size, pieces, jigsaw(size, pieces)))
 }
 
 fn finalize_meshes(ugli: &Ugli, meshes: Vec<Mesh>) -> Vec<JigsawMesh> {
@@ -15,11 +15,11 @@ fn finalize_meshes(ugli: &Ugli, meshes: Vec<Mesh>) -> Vec<JigsawMesh> {
 
 type Polygon = Vec<Vec2<f32>>;
 
-fn jigsaw(size: Vec2<usize>) -> Vec<Polygon> {
-    let tile_size = vec2(1.0, 1.0) / size.map(|x| x as f32);
-    let mut jigsaw: Vec<[Vec<Vec2<f32>>; 4]> = (0..size.y)
+fn jigsaw(size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
+    let tile_size = size / pieces.map(|x| x as f32);
+    let mut jigsaw: Vec<[Vec<Vec2<f32>>; 4]> = (0..pieces.y)
         .flat_map(|y| {
-            (0..size.x).map(move |x| {
+            (0..pieces.x).map(move |x| {
                 let pos = vec2(x as f32, y as f32) * tile_size;
                 [
                     vec![pos],
@@ -31,9 +31,10 @@ fn jigsaw(size: Vec2<usize>) -> Vec<Polygon> {
         })
         .collect();
 
-    let vertical_edges = size.y * (size.x - 1);
-    let edges_count = vertical_edges + size.x * (size.y - 1);
+    let vertical_edges = pieces.y * (pieces.x - 1);
+    let edges_count = vertical_edges + pieces.x * (pieces.y - 1);
     let mut rng = geng::prelude::thread_rng();
+    // (x - 0.1)^2 + (y - 0.15)^2 = 0.025
     let knob = vec![
         vec2(0.0, 0.0275),
         vec2(-0.058, 0.144),
@@ -61,12 +62,12 @@ fn jigsaw(size: Vec2<usize>) -> Vec<Polygon> {
     for (i, mut edge) in edges.into_iter().enumerate() {
         let vertical = i < vertical_edges;
         let tile = if vertical {
-            i / size.y + i % size.y * size.x
+            i / pieces.y + i % pieces.y * pieces.x
         } else {
             i - vertical_edges
         };
-        let pos = vec2(tile % size.x, tile / size.x).map(|x| x as f32) * tile_size;
-        let other = if vertical { tile + 1 } else { tile + size.x };
+        let pos = vec2(tile % pieces.x, tile / pieces.x).map(|x| x as f32) * tile_size;
+        let other = if vertical { tile + 1 } else { tile + pieces.x };
         let scale = if vertical { tile_size.y } else { tile_size.x };
         if vertical {
             edge.iter_mut()
@@ -90,13 +91,14 @@ fn jigsaw(size: Vec2<usize>) -> Vec<Polygon> {
         .collect()
 }
 
-fn triangulate(pieces: Vec2<usize>, polygons: Vec<Polygon>) -> Vec<Mesh> {
+fn triangulate(size: Vec2<f32>, pieces: Vec2<usize>, polygons: Vec<Polygon>) -> Vec<Mesh> {
     polygons
         .into_iter()
         .enumerate()
         .map(|(i, polygon)| {
-            let center =
-                vec2(i % pieces.x, i / pieces.x).map(|x| x as f32 + 0.5) / pieces.map(|x| x as f32);
+            let center = vec2(i % pieces.x, i / pieces.x).map(|x| x as f32 + 0.5)
+                / pieces.map(|x| x as f32)
+                * size;
 
             let flat_polygon: Vec<f32> = polygon.iter().flat_map(|v| [v.x, v.y]).collect();
             let triangles =
@@ -107,18 +109,10 @@ fn triangulate(pieces: Vec2<usize>, polygons: Vec<Polygon>) -> Vec<Mesh> {
                     let triangle = [triangle[0], triangle[1], triangle[2]];
                     triangle.map(|i| JigsawVertex {
                         a_pos: polygon[i] - center,
-                        a_uv: polygon[i],
+                        a_uv: polygon[i] / size,
                     })
                 })
                 .collect()
         })
         .collect()
-}
-
-fn scale(size: Vec2<f32>, mut polygons: Vec<Mesh>) -> Vec<Mesh> {
-    polygons.iter_mut().for_each(|mesh| {
-        mesh.iter_mut()
-            .for_each(|triangle| triangle.iter_mut().for_each(|v| v.a_pos *= size))
-    });
-    polygons
 }

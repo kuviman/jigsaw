@@ -196,7 +196,7 @@ impl geng::State for Game {
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
-        ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
+        ugli::clear(framebuffer, Some(Rgba::new(0.1, 0.1, 0.1, 1.0)), None, None);
 
         for tile in &self.jigsaw.tiles {
             let matrix = tile.matrix();
