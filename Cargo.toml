@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+earcutr = "0.4.1"
 geng = { git = "https://github.com/kuviman/geng" }
 serde = "1"

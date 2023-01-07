@@ -1,3 +1,7 @@
+use geng::Camera2d;
+
+use crate::jigsaw::Jigsaw;
+
 use super::*;
 
 type Connection = geng::net::client::Connection<ServerMessage, ClientMessage>;
@@ -15,6 +19,9 @@ struct Game {
     room: String,
     connection: Connection,
     players: Collection<Player>,
+    camera: Camera2d,
+    framebuffer_size: Vec2<usize>,
+    jigsaw: Jigsaw,
 }
 
 impl Game {
@@ -32,6 +39,17 @@ impl Game {
             room,
             connection,
             players: Collection::new(),
+            camera: Camera2d {
+                center: Vec2::ZERO,
+                rotation: 0.0,
+                fov: 30.0,
+            },
+            framebuffer_size: vec2(1, 1),
+            jigsaw: {
+                let size = assets.puzzle.size().map(|x| x as f32);
+                let size = size * 10.0 / size.y;
+                Jigsaw::generate(geng.ugli(), size, size.map(|x| x.floor() as usize))
+            },
         }
     }
     fn get_player(&mut self, id: Id) -> &mut Player {
@@ -69,18 +87,45 @@ impl geng::State for Game {
         }
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
+        self.framebuffer_size = framebuffer.size();
         ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
+
+        for piece in &self.jigsaw.pieces {
+            let matrix = Mat3::translate(piece.pos);
+            ugli::draw(
+                framebuffer,
+                &self.assets.shaders.jigsaw,
+                ugli::DrawMode::Triangles,
+                &piece.mesh,
+                (
+                    ugli::uniforms! {
+                        u_model_matrix: matrix,
+                        u_texture: &self.assets.puzzle,
+                    },
+                    geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
+                ),
+                ugli::DrawParameters::default(),
+            )
+        }
+
         for player in &self.players {
             self.geng.draw_2d(
                 framebuffer,
-                &geng::PixelPerfectCamera,
-                &draw_2d::Ellipse::circle(player.interpolation.get(), 10.0, Rgba::WHITE),
+                &self.camera,
+                &draw_2d::Ellipse::circle(
+                    player.interpolation.get(),
+                    self.camera.fov * 0.01,
+                    Rgba::WHITE,
+                ),
             );
         }
     }
     fn handle_event(&mut self, event: geng::Event) {
         if let geng::Event::MouseMove { position, .. } = event {
-            let pos = position.map(|x| x as f32);
+            let pos = self.camera.screen_to_world(
+                self.framebuffer_size.map(|x| x as f32),
+                position.map(|x| x as f32),
+            );
             self.connection.send(ClientMessage::UpdatePos(pos));
             let me = self.get_player(self.id);
             me.interpolation.server_update(pos, Vec2::ZERO);

@@ -4,6 +4,7 @@ mod assets;
 mod game;
 mod interop;
 mod interpolation;
+mod jigsaw;
 #[cfg(not(target_arch = "wasm32"))]
 mod server;
 
