@@ -34,6 +34,16 @@ fn create_room() -> String {
 struct State {
     id_gen: IdGen,
     players: Collection<Player>,
+    rooms: HashMap<String, Room>,
+}
+
+struct JigsawTile {
+    grabbed_by: Option<Id>,
+}
+
+struct Room {
+    name: String,
+    tiles: Vec<JigsawTile>,
 }
 
 impl State {
@@ -41,6 +51,7 @@ impl State {
         Self {
             id_gen: IdGen::new(),
             players: Collection::new(),
+            rooms: HashMap::new(),
         }
     }
     fn handle(&mut self, id: Id, message: ClientMessage) {
@@ -59,6 +70,39 @@ impl State {
                 player
                     .sender
                     .send(ServerMessage::SetupId(id, player.room.clone()));
+            }
+            ClientMessage::GrabTile(tile_id) => {
+                if let Some(room) = self.rooms.get_mut(&room) {
+                    if let Some(tile) = room.tiles.get_mut(tile_id) {
+                        if tile.grabbed_by.is_none() {
+                            tile.grabbed_by = Some(id);
+                            for player in &mut self.players {
+                                if player.room == room.name {
+                                    player.sender.send(ServerMessage::TileGrabbed {
+                                        player: id,
+                                        tile: tile_id,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            ClientMessage::ReleaseTile(tile_id) => {
+                if let Some(room) = self.rooms.get_mut(&room) {
+                    if let Some(tile) = room.tiles.get_mut(tile_id) {
+                        if tile.grabbed_by == Some(id) {
+                            for player in &mut self.players {
+                                if player.room == room.name {
+                                    player.sender.send(ServerMessage::TileReleased {
+                                        player: id,
+                                        tile: tile_id,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

@@ -7,6 +7,7 @@ mod interpolation;
 mod jigsaw;
 #[cfg(not(target_arch = "wasm32"))]
 mod server;
+mod util;
 
 use assets::Assets;
 use interop::*;

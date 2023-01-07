@@ -10,6 +10,7 @@ type Connection = geng::net::client::Connection<ServerMessage, ClientMessage>;
 struct Player {
     id: Id,
     interpolation: Interpolated<Vec2<f32>>,
+    tile_grabbed: Option<usize>,
 }
 
 struct Game {
@@ -57,6 +58,7 @@ impl Game {
             self.players.insert(Player {
                 id,
                 interpolation: Interpolated::new(Vec2::ZERO, Vec2::ZERO),
+                tile_grabbed: None,
             });
         }
         self.players.get_mut(&id).unwrap()
@@ -73,7 +75,31 @@ impl Game {
                 ServerMessage::PlayerDisconnected(id) => {
                     self.players.remove(&id);
                 }
+                ServerMessage::TileGrabbed { player, tile } => {
+                    self.players.get_mut(&player).unwrap().tile_grabbed = Some(tile);
+                    self.jigsaw.tiles[tile].grabbed_by = Some(player);
+                }
+                ServerMessage::TileReleased { player, tile } => {
+                    self.players.get_mut(&player).unwrap().tile_grabbed = None;
+                    self.jigsaw.tiles[tile].grabbed_by = None;
+                }
             }
+        }
+    }
+    fn click(&mut self, pos: Vec2<f32>) {
+        for (i, tile) in self.jigsaw.tiles.iter_mut().enumerate() {
+            if tile.contains(pos) {
+                self.players.get_mut(&self.id).unwrap().tile_grabbed = Some(i);
+                tile.grabbed_by = Some(self.id);
+                self.connection.send(ClientMessage::GrabTile(i));
+            }
+        }
+    }
+    fn release(&mut self) {
+        let player = self.players.get_mut(&self.id).unwrap();
+        if let Some(tile) = player.tile_grabbed.take() {
+            self.jigsaw.tiles.get_mut(tile).unwrap().grabbed_by = None;
+            self.connection.send(ClientMessage::ReleaseTile(tile));
         }
     }
 }
@@ -84,14 +110,25 @@ impl geng::State for Game {
         self.handle_connection();
         for player in &mut self.players {
             player.interpolation.update(delta_time);
+
+            // Update grabbed tile
+            if let Some(tile) = player.tile_grabbed {
+                if let Some(tile) = self.jigsaw.tiles.get_mut(tile) {
+                    if tile.grabbed_by != Some(player.id) {
+                        player.tile_grabbed = None;
+                    } else {
+                        tile.pos = player.interpolation.get();
+                    }
+                }
+            }
         }
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
         ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
 
-        for piece in &self.jigsaw.pieces {
-            let matrix = Mat3::translate(piece.pos);
+        for piece in &self.jigsaw.tiles {
+            let matrix = piece.matrix();
             ugli::draw(
                 framebuffer,
                 &self.assets.shaders.jigsaw,
@@ -121,15 +158,34 @@ impl geng::State for Game {
         }
     }
     fn handle_event(&mut self, event: geng::Event) {
-        if let geng::Event::MouseMove { position, .. } = event {
-            let pos = self.camera.screen_to_world(
-                self.framebuffer_size.map(|x| x as f32),
-                position.map(|x| x as f32),
-            );
-            self.connection.send(ClientMessage::UpdatePos(pos));
-            let me = self.get_player(self.id);
-            me.interpolation.server_update(pos, Vec2::ZERO);
-            me.interpolation.update(1e5); // HAHA
+        match event {
+            geng::Event::MouseMove { position, .. } => {
+                let pos = self.camera.screen_to_world(
+                    self.framebuffer_size.map(|x| x as f32),
+                    position.map(|x| x as f32),
+                );
+                self.connection.send(ClientMessage::UpdatePos(pos));
+                let me = self.get_player(self.id);
+                me.interpolation.server_update(pos, Vec2::ZERO);
+                me.interpolation.update(1e5); // HAHA
+            }
+            geng::Event::MouseDown {
+                position,
+                button: geng::MouseButton::Left,
+            } => {
+                let pos = self.camera.screen_to_world(
+                    self.framebuffer_size.map(|x| x as f32),
+                    position.map(|x| x as f32),
+                );
+                self.click(pos);
+            }
+            geng::Event::MouseUp {
+                button: geng::MouseButton::Left,
+                ..
+            } => {
+                self.release();
+            }
+            _ => (),
         }
     }
 }

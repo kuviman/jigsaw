@@ -11,11 +11,12 @@ pub struct JigsawVertex {
 }
 
 pub struct Jigsaw {
-    pub pieces: Vec<JigsawPiece>,
+    pub tiles: Vec<JigsawTile>,
 }
 
-pub struct JigsawPiece {
+pub struct JigsawTile {
     pub pos: Vec2<f32>,
+    pub grabbed_by: Option<Id>,
     pub puzzle_pos: Vec2<usize>,
     pub mesh: JigsawMesh,
 }
@@ -24,18 +25,39 @@ impl Jigsaw {
     pub fn generate(ugli: &Ugli, size: Vec2<f32>, pieces: Vec2<usize>) -> Self {
         let tile_size = size / pieces.map(|x| x as f32);
         Self {
-            pieces: gen::generate_jigsaw(ugli, size, pieces)
+            tiles: gen::generate_jigsaw(ugli, size, pieces)
                 .into_iter()
                 .enumerate()
                 .map(|(i, mesh)| {
                     let puzzle_pos = vec2(i % pieces.x, i / pieces.x);
-                    JigsawPiece {
+                    JigsawTile {
                         pos: puzzle_pos.map(|x| x as f32) * tile_size,
+                        grabbed_by: None,
                         puzzle_pos,
                         mesh,
                     }
                 })
                 .collect(),
         }
+    }
+}
+
+impl JigsawTile {
+    pub fn matrix(&self) -> Mat3<f32> {
+        Mat3::translate(self.pos)
+    }
+
+    pub fn contains(&self, pos: Vec2<f32>) -> bool {
+        let matrix = self.matrix();
+        for triangle in self.mesh.chunks(3) {
+            let triangle = [triangle[0], triangle[1], triangle[2]].map(|p| {
+                let p = matrix * p.a_pos.extend(1.0);
+                p.xy() / p.z
+            });
+            if util::triangle_contains(triangle, pos) {
+                return true;
+            }
+        }
+        false
     }
 }
