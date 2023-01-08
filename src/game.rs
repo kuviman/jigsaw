@@ -110,15 +110,15 @@ impl Game {
                     self.jigsaw.tiles[tile].grabbed_by = Some(player);
                 }
                 ServerMessage::TileReleased { player, tile, pos } => {
-                    let offset = self
-                        .players
-                        .get_mut(&player)
-                        .unwrap()
+                    let player = self.get_player(player);
+                    let offset = player
                         .tile_grabbed
                         .take()
                         .map_or(Vec2::ZERO, |(_, offset)| offset);
+                    let vel = Some(player.interpolation.get_derivative());
                     self.jigsaw.tiles[tile].grabbed_by = None;
-                    self.move_tile(tile, pos + offset, false);
+                    self.move_tile(tile, self.jigsaw.tiles[tile].interpolated.get(), vel, true);
+                    self.move_tile(tile, pos + offset, None, false);
                 }
                 ServerMessage::ConnectTiles(a, b) => {
                     self.jigsaw.tiles[a].connected_to.push(b);
@@ -136,7 +136,7 @@ impl Game {
                     } else {
                         unreachable!()
                     };
-                    self.move_tile(a, pos, false);
+                    self.move_tile(a, pos, None, false);
                 }
             }
         }
@@ -201,21 +201,20 @@ impl Game {
             }
         }
     }
-    fn move_tile(&mut self, tile: usize, pos: Vec2<f32>, snap: bool) {
+    fn move_tile(&mut self, tile: usize, pos: Vec2<f32>, vel: Option<Vec2<f32>>, snap: bool) {
+        let vel = vel.unwrap_or(Vec2::ZERO);
         let tiles = self.jigsaw.get_all_connected(tile);
         let start_pos = self.jigsaw.tiles[tile].puzzle_pos.map(|x| x as i32);
         for tile in tiles {
             let delta = self.jigsaw.tiles[tile].puzzle_pos.map(|x| x as i32) - start_pos;
             if snap {
-                self.jigsaw.tiles[tile].interpolated.teleport(
-                    pos + delta.map(|x| x as f32) * self.jigsaw.tile_size,
-                    Vec2::ZERO,
-                );
+                self.jigsaw.tiles[tile]
+                    .interpolated
+                    .teleport(pos + delta.map(|x| x as f32) * self.jigsaw.tile_size, vel);
             } else {
-                self.jigsaw.tiles[tile].interpolated.server_update(
-                    pos + delta.map(|x| x as f32) * self.jigsaw.tile_size,
-                    Vec2::ZERO,
-                );
+                self.jigsaw.tiles[tile]
+                    .interpolated
+                    .server_update(pos + delta.map(|x| x as f32) * self.jigsaw.tile_size, vel);
             }
         }
     }
@@ -269,7 +268,7 @@ impl geng::State for Game {
             }
         }
         for (tile, pos) in moves {
-            self.move_tile(tile, pos, true);
+            self.move_tile(tile, pos, None, true);
         }
 
         for tile in &mut self.jigsaw.tiles {
