@@ -2,8 +2,13 @@ use super::*;
 
 type Mesh = Vec<[JigsawVertex; 3]>;
 
-pub fn generate_jigsaw(ugli: &Ugli, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<JigsawMesh> {
-    finalize_meshes(ugli, triangulate(size, pieces, jigsaw(size, pieces)))
+pub fn generate_jigsaw(
+    ugli: &Ugli,
+    seed: u64,
+    size: Vec2<f32>,
+    pieces: Vec2<usize>,
+) -> Vec<JigsawMesh> {
+    finalize_meshes(ugli, triangulate(size, pieces, jigsaw(seed, size, pieces)))
 }
 
 fn finalize_meshes(ugli: &Ugli, meshes: Vec<Mesh>) -> Vec<JigsawMesh> {
@@ -15,7 +20,7 @@ fn finalize_meshes(ugli: &Ugli, meshes: Vec<Mesh>) -> Vec<JigsawMesh> {
 
 type Polygon = Vec<Vec2<f32>>;
 
-fn jigsaw(size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
+fn jigsaw(seed: u64, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
     let tile_size = size / pieces.map(|x| x as f32);
     let mut jigsaw: Vec<[Vec<Vec2<f32>>; 4]> = (0..pieces.y)
         .flat_map(|y| {
@@ -33,7 +38,7 @@ fn jigsaw(size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
 
     let vertical_edges = pieces.y * (pieces.x - 1);
     let edges_count = vertical_edges + pieces.x * (pieces.y - 1);
-    let mut rng = geng::prelude::thread_rng();
+    let mut rng = rand::prelude::StdRng::seed_from_u64(seed);
     // (x - 0.1)^2 + (y - 0.15)^2 = 0.025
     let knob = vec![
         vec2(0.0, 0.0275),

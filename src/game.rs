@@ -51,8 +51,9 @@ impl Game {
             jigsaw: {
                 let size = assets.puzzle.size().map(|x| x as f32);
                 let size = size * 5.0 / size.y;
+                let seed = thread_rng().gen(); // TODO: get from the room
                 let mut jigsaw =
-                    Jigsaw::generate(geng.ugli(), size, size.map(|x| x.floor() as usize));
+                    Jigsaw::generate(geng.ugli(), seed, size, size.map(|x| x.floor() as usize));
                 for tile in &mut jigsaw.tiles {
                     tile.pos -= size / 2.0;
                 }

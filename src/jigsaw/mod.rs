@@ -24,11 +24,11 @@ pub struct JigsawTile {
 }
 
 impl Jigsaw {
-    pub fn generate(ugli: &Ugli, size: Vec2<f32>, pieces: Vec2<usize>) -> Self {
+    pub fn generate(ugli: &Ugli, seed: u64, size: Vec2<f32>, pieces: Vec2<usize>) -> Self {
         let tile_size = size / pieces.map(|x| x as f32);
         Self {
             tile_size,
-            tiles: gen::generate_jigsaw(ugli, size, pieces)
+            tiles: gen::generate_jigsaw(ugli, seed, size, pieces)
                 .into_iter()
                 .enumerate()
                 .map(|(i, mesh)| {
