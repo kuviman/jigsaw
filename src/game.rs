@@ -5,6 +5,8 @@ use crate::jigsaw::Jigsaw;
 use super::*;
 
 const SNAP_DISTANCE: f32 = 0.2;
+const FOV_MIN: f32 = 2.0;
+const FOV_MAX: f32 = 20.0;
 
 type Connection = geng::net::client::Connection<ServerMessage, ClientMessage>;
 
@@ -25,6 +27,18 @@ struct Game {
     camera: Camera2d,
     framebuffer_size: Vec2<usize>,
     jigsaw: Jigsaw,
+    dragging: Option<Dragging>,
+}
+
+#[derive(Debug, Clone)]
+struct Dragging {
+    pub initial_screen_pos: Vec2<f64>,
+    pub target: DragTarget,
+}
+
+#[derive(Debug, Clone)]
+enum DragTarget {
+    Camera { initial_camera_pos: Vec2<f32> },
 }
 
 impl Game {
@@ -47,6 +61,7 @@ impl Game {
                 fov: 10.0,
             },
             framebuffer_size: vec2(1, 1),
+            dragging: None,
             jigsaw: {
                 let image = &assets.images[room_config.image];
                 let size = image.size().map(|x| x as f32);
@@ -139,6 +154,7 @@ impl Game {
         }
     }
     fn release(&mut self) {
+        self.stop_drag();
         let player = self.players.get_mut(&self.id).unwrap();
         if let Some((tile_id, _)) = player.tile_grabbed.take() {
             self.connection.send(ClientMessage::ReleaseTile(
@@ -202,6 +218,34 @@ impl Game {
                 );
             }
         }
+    }
+    fn start_drag(&mut self, drag: Dragging) {
+        self.stop_drag();
+        self.dragging = Some(drag);
+    }
+    fn update_cursor(&mut self, screen_pos: Vec2<f64>) {
+        let cursor_pos = self.camera.screen_to_world(
+            self.framebuffer_size.map(|x| x as f32),
+            screen_pos.map(|x| x as f32),
+        );
+        self.connection.send(ClientMessage::UpdatePos(cursor_pos));
+        let me = self.get_player(self.id);
+        me.interpolation.teleport(cursor_pos, Vec2::ZERO);
+
+        if let Some(dragging) = &mut self.dragging {
+            match dragging.target {
+                DragTarget::Camera { initial_camera_pos } => {
+                    let from = self.camera.screen_to_world(
+                        self.framebuffer_size.map(|x| x as f32),
+                        dragging.initial_screen_pos.map(|x| x as f32),
+                    );
+                    self.camera.center = initial_camera_pos + from - cursor_pos;
+                }
+            }
+        }
+    }
+    fn stop_drag(&mut self) {
+        if let Some(_dragging) = self.dragging.take() {}
     }
 }
 
@@ -282,29 +326,33 @@ impl geng::State for Game {
     }
     fn handle_event(&mut self, event: geng::Event) {
         match event {
+            geng::Event::Wheel { delta } => {
+                const SENSITIVITY: f32 = 0.1;
+                self.camera.fov =
+                    (self.camera.fov - delta as f32 * SENSITIVITY).clamp(FOV_MIN, FOV_MAX);
+            }
             geng::Event::MouseMove { position, .. } => {
-                let pos = self.camera.screen_to_world(
-                    self.framebuffer_size.map(|x| x as f32),
-                    position.map(|x| x as f32),
-                );
-                self.connection.send(ClientMessage::UpdatePos(pos));
-                let me = self.get_player(self.id);
-                me.interpolation.teleport(pos, Vec2::ZERO);
+                self.update_cursor(position);
             }
-            geng::Event::MouseDown {
-                position,
-                button: geng::MouseButton::Left,
-            } => {
-                let pos = self.camera.screen_to_world(
-                    self.framebuffer_size.map(|x| x as f32),
-                    position.map(|x| x as f32),
-                );
-                self.click(pos);
-            }
-            geng::Event::MouseUp {
-                button: geng::MouseButton::Left,
-                ..
-            } => {
+            geng::Event::MouseDown { position, button } => match button {
+                geng::MouseButton::Left => {
+                    let pos = self.camera.screen_to_world(
+                        self.framebuffer_size.map(|x| x as f32),
+                        position.map(|x| x as f32),
+                    );
+                    self.click(pos);
+                }
+                geng::MouseButton::Right => {
+                    self.start_drag(Dragging {
+                        initial_screen_pos: position,
+                        target: DragTarget::Camera {
+                            initial_camera_pos: self.camera.center,
+                        },
+                    });
+                }
+                geng::MouseButton::Middle => {}
+            },
+            geng::Event::MouseUp { .. } => {
                 self.release();
             }
             _ => (),
