@@ -164,7 +164,7 @@ impl geng::net::server::App for App {
     fn connect(&mut self, sender: Box<dyn geng::net::Sender<ServerMessage>>) -> Client {
         let mut state = self.state.lock().unwrap();
         let id = state.id_gen.gen();
-        let mut player = Player {
+        let player = Player {
             id,
             room: create_room(),
             sender,

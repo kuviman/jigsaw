@@ -29,7 +29,7 @@ struct Opt {
 }
 
 fn main() {
-    logger::init();
+    let _ = logger::init();
     geng::setup_panic_handler();
     let mut opt: Opt = program_args::parse();
 

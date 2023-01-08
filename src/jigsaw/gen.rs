@@ -140,9 +140,9 @@ fn outline_vertices(
         .collect()
 }
 
-fn triangulate(polygons: &Vec<Vec<JigsawVertex>>) -> Vec<Mesh> {
+fn triangulate(polygons: &[Vec<JigsawVertex>]) -> Vec<Mesh> {
     polygons
-        .into_iter()
+        .iter()
         .map(|polygon| {
             let flat_polygon: Vec<f32> = polygon
                 .iter()

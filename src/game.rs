@@ -317,7 +317,7 @@ impl geng::State for Game {
         for tile in tiles {
             let mut matrix = tile.matrix();
             if tile.grabbed_by.is_some() {
-                matrix = matrix * Mat3::scale_uniform(1.2);
+                matrix *= Mat3::scale_uniform(1.2);
             }
             ugli::draw(
                 framebuffer,
@@ -417,5 +417,5 @@ pub fn run(geng: &Geng, addr: &str, room: &str) -> impl geng::State {
             }
         }
     };
-    geng::LoadingScreen::new(&geng, geng::EmptyLoadingScreen, future, |state| state)
+    geng::LoadingScreen::new(geng, geng::EmptyLoadingScreen, future, |state| state)
 }
