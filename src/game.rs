@@ -161,6 +161,7 @@ impl Game {
                 tile.grabbed_by = Some(self.id);
                 self.connection
                     .send(ClientMessage::GrabTile { tile: i, offset });
+                break;
             }
         }
     }
@@ -305,7 +306,10 @@ impl geng::State for Game {
         );
 
         for tile in &self.jigsaw.tiles {
-            let matrix = tile.matrix();
+            let mut matrix = tile.matrix();
+            if tile.grabbed_by.is_some() {
+                matrix = matrix * Mat3::scale_uniform(1.2);
+            }
             ugli::draw(
                 framebuffer,
                 &self.assets.shaders.outline,
