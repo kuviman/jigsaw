@@ -56,6 +56,13 @@ impl<T: Mul<f32, Output = T> + Add<Output = T> + Sub<Output = T> + Copy + Zero> 
             t: 0.0,
         }
     }
+    pub fn teleport(&mut self, p: T, v: T) {
+        self.a = T::ZERO;
+        self.b = T::ZERO;
+        self.c = v * INTERPOLATION_TIME;
+        self.d = p;
+        self.t = 0.0;
+    }
     pub fn server_update(&mut self, p2: T, v2: T) {
         let p2 = p2 + v2 * INTERPOLATION_TIME;
         let p1 = self.get();

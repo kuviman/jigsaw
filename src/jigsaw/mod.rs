@@ -16,7 +16,7 @@ pub struct Jigsaw {
 }
 
 pub struct JigsawTile {
-    pub pos: Vec2<f32>,
+    pub interpolated: Interpolated<Vec2<f32>>,
     pub grabbed_by: Option<Id>,
     pub connected_to: Vec<usize>,
     pub puzzle_pos: Vec2<usize>,
@@ -34,7 +34,10 @@ impl Jigsaw {
                 .map(|(i, mesh)| {
                     let puzzle_pos = vec2(i % pieces.x, i / pieces.x);
                     JigsawTile {
-                        pos: puzzle_pos.map(|x| x as f32 + 0.5) * tile_size,
+                        interpolated: Interpolated::new(
+                            puzzle_pos.map(|x| x as f32 + 0.5) * tile_size,
+                            Vec2::ZERO,
+                        ),
                         grabbed_by: None,
                         connected_to: vec![],
                         puzzle_pos,
@@ -63,7 +66,7 @@ impl Jigsaw {
 
 impl JigsawTile {
     pub fn matrix(&self) -> Mat3<f32> {
-        Mat3::translate(self.pos)
+        Mat3::translate(self.interpolated.get())
     }
 
     pub fn contains(&self, pos: Vec2<f32>) -> bool {
