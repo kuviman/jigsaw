@@ -7,14 +7,26 @@ pub fn generate_jigsaw(
     seed: u64,
     size: Vec2<f32>,
     pieces: Vec2<usize>,
-) -> Vec<JigsawMesh> {
-    finalize_meshes(ugli, triangulate(size, pieces, jigsaw(seed, size, pieces)))
+) -> Vec<(JigsawMesh, ugli::VertexBuffer<JigsawVertex>)> {
+    let outlines = outline_vertices(size, pieces, jigsaw(seed, size, pieces));
+    let triangles = triangulate(&outlines);
+    finalize_meshes(ugli, triangles, outlines)
 }
 
-fn finalize_meshes(ugli: &Ugli, meshes: Vec<Mesh>) -> Vec<JigsawMesh> {
-    meshes
+fn finalize_meshes(
+    ugli: &Ugli,
+    triangles: Vec<Mesh>,
+    outlines: Vec<Vec<JigsawVertex>>,
+) -> Vec<(JigsawMesh, ugli::VertexBuffer<JigsawVertex>)> {
+    triangles
         .into_iter()
-        .map(|mesh| ugli::VertexBuffer::new_dynamic(ugli, mesh.into_iter().flatten().collect()))
+        .zip(outlines)
+        .map(|(mesh, outline)| {
+            (
+                ugli::VertexBuffer::new_dynamic(ugli, mesh.into_iter().flatten().collect()),
+                ugli::VertexBuffer::new_dynamic(ugli, outline),
+            )
+        })
         .collect()
 }
 
@@ -99,7 +111,11 @@ fn jigsaw(seed: u64, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
         .collect()
 }
 
-fn triangulate(size: Vec2<f32>, pieces: Vec2<usize>, polygons: Vec<Polygon>) -> Vec<Mesh> {
+fn outline_vertices(
+    size: Vec2<f32>,
+    pieces: Vec2<usize>,
+    polygons: Vec<Polygon>,
+) -> Vec<Vec<JigsawVertex>> {
     polygons
         .into_iter()
         .enumerate()
@@ -107,18 +123,33 @@ fn triangulate(size: Vec2<f32>, pieces: Vec2<usize>, polygons: Vec<Polygon>) -> 
             let center = vec2(i % pieces.x, i / pieces.x).map(|x| x as f32 + 0.5)
                 / pieces.map(|x| x as f32)
                 * size;
+            polygon
+                .into_iter()
+                .map(|v| JigsawVertex {
+                    a_pos: v - center,
+                    a_uv: v / size,
+                })
+                .collect()
+        })
+        .collect()
+}
 
-            let flat_polygon: Vec<f32> = polygon.iter().flat_map(|v| [v.x, v.y]).collect();
+fn triangulate(polygons: &Vec<Vec<JigsawVertex>>) -> Vec<Mesh> {
+    polygons
+        .into_iter()
+        .enumerate()
+        .map(|(i, polygon)| {
+            let flat_polygon: Vec<f32> = polygon
+                .iter()
+                .flat_map(|v| [v.a_pos.x, v.a_pos.y])
+                .collect();
             let triangles =
                 earcutr::earcut(&flat_polygon, &[], 2).expect("Failed to triangulate mesh");
             triangles
                 .chunks(3)
                 .map(|triangle| {
                     let triangle = [triangle[0], triangle[1], triangle[2]];
-                    triangle.map(|i| JigsawVertex {
-                        a_pos: polygon[i] - center,
-                        a_uv: polygon[i] / size,
-                    })
+                    triangle.map(|i| polygon[i])
                 })
                 .collect()
         })

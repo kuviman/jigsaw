@@ -10,4 +10,5 @@ pub struct Assets {
 #[derive(geng::Assets)]
 pub struct Shaders {
     pub jigsaw: ugli::Program,
+    pub outline: ugli::Program,
 }

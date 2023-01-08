@@ -240,6 +240,20 @@ impl geng::State for Game {
             let matrix = tile.matrix();
             ugli::draw(
                 framebuffer,
+                &self.assets.shaders.outline,
+                ugli::DrawMode::LineLoop { line_width: 2.0 },
+                &tile.outline,
+                (
+                    ugli::uniforms! {
+                        u_model_matrix: matrix,
+                        u_color: Rgba::BLACK,
+                    },
+                    geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
+                ),
+                ugli::DrawParameters::default(),
+            );
+            ugli::draw(
+                framebuffer,
                 &self.assets.shaders.jigsaw,
                 ugli::DrawMode::Triangles,
                 &tile.mesh,

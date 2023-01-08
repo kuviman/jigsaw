@@ -21,6 +21,7 @@ pub struct JigsawTile {
     pub connected_to: Vec<usize>,
     pub puzzle_pos: Vec2<usize>,
     pub mesh: JigsawMesh,
+    pub outline: ugli::VertexBuffer<JigsawVertex>,
 }
 
 impl Jigsaw {
@@ -31,7 +32,7 @@ impl Jigsaw {
             tiles: gen::generate_jigsaw(ugli, seed, size, pieces)
                 .into_iter()
                 .enumerate()
-                .map(|(i, mesh)| {
+                .map(|(i, (mesh, outline))| {
                     let puzzle_pos = vec2(i % pieces.x, i / pieces.x);
                     JigsawTile {
                         interpolated: Interpolated::new(
@@ -42,6 +43,7 @@ impl Jigsaw {
                         connected_to: vec![],
                         puzzle_pos,
                         mesh,
+                        outline,
                     }
                 })
                 .collect(),
