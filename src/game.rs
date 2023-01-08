@@ -89,8 +89,9 @@ impl Game {
                     self.players.get_mut(&player).unwrap().tile_grabbed = Some(tile);
                     self.jigsaw.tiles[tile].grabbed_by = Some(player);
                 }
-                ServerMessage::TileReleased { player, tile } => {
+                ServerMessage::TileReleased { player, tile, pos } => {
                     self.players.get_mut(&player).unwrap().tile_grabbed = None;
+                    self.jigsaw.tiles[tile].pos = pos;
                     self.jigsaw.tiles[tile].grabbed_by = None;
                 }
                 ServerMessage::ConnectTiles(a, b) => {
@@ -126,7 +127,10 @@ impl Game {
     fn release(&mut self) {
         let player = self.players.get_mut(&self.id).unwrap();
         if let Some(tile_id) = player.tile_grabbed.take() {
-            self.connection.send(ClientMessage::ReleaseTile(tile_id));
+            self.connection.send(ClientMessage::ReleaseTile(
+                tile_id,
+                player.interpolation.get(),
+            ));
             let tile = self.jigsaw.tiles.get_mut(tile_id).unwrap();
             tile.grabbed_by = None;
 

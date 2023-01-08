@@ -10,8 +10,15 @@ pub enum ServerMessage {
     RoomCreated(String),
     PlayerDisconnected(Id),
     UpdatePos(Id, Vec2<f32>),
-    TileGrabbed { player: Id, tile: usize },
-    TileReleased { player: Id, tile: usize },
+    TileGrabbed {
+        player: Id,
+        tile: usize,
+    },
+    TileReleased {
+        player: Id,
+        tile: usize,
+        pos: Vec2<f32>,
+    },
     ConnectTiles(usize, usize),
 }
 
@@ -21,7 +28,7 @@ pub enum ClientMessage {
     SelectRoom(String),
     UpdatePos(Vec2<f32>),
     GrabTile(usize),
-    ReleaseTile(usize),
+    ReleaseTile(usize, Vec2<f32>),
     ConnectTiles(usize, usize),
 }
 

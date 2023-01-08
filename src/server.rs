@@ -37,6 +37,7 @@ struct State {
     rooms: Collection<Room>,
 }
 
+#[derive(Clone)]
 struct JigsawTile {
     grabbed_by: Option<Id>,
 }
@@ -69,7 +70,7 @@ impl State {
                     let player = self.players.get_mut(&id).unwrap();
                     self.rooms.insert(Room {
                         name: name.clone(),
-                        tiles: default(),
+                        tiles: vec![JigsawTile { grabbed_by: None }; config.size.x * config.size.y],
                         config,
                     });
                     player.sender.send(ServerMessage::RoomCreated(name));
@@ -111,15 +112,16 @@ impl State {
                     }
                 }
             }
-            ClientMessage::ReleaseTile(tile_id) => {
+            ClientMessage::ReleaseTile(tile_id, pos) => {
                 if let Some(room) = self.rooms.get_mut(&room) {
                     if let Some(tile) = room.tiles.get_mut(tile_id) {
-                        if tile.grabbed_by == Some(id) {
+                        if tile.grabbed_by.take() == Some(id) {
                             for player in &mut self.players {
                                 if player.room == room.name {
                                     player.sender.send(ServerMessage::TileReleased {
                                         player: id,
                                         tile: tile_id,
+                                        pos,
                                     });
                                 }
                             }
