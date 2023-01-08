@@ -55,7 +55,7 @@ fn jigsaw(seed: u64, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
     let mut edges: Vec<Vec<Vec2<f32>>> = (0..edges_count)
         .map(|i| {
             let t = i as f32 / (edges_count as f32 - 1.0);
-            let start = 0.2 + t * 0.4;
+            let start = 0.3 + t * 0.2;
             let end = start + 0.2;
             itertools::chain![
                 [vec2(start, 0.0)],
