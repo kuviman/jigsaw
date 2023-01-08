@@ -86,6 +86,12 @@ fn jigsaw(seed: u64, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
         } else {
             i - vertical_edges
         };
+
+        if rng.gen() {
+            // Flip edge
+            edge.iter_mut().for_each(|v| *v = vec2(v.x, -v.y));
+        }
+
         let pos = vec2(tile % pieces.x, tile / pieces.x).map(|x| x as f32) * tile_size;
         let other = if vertical { tile + 1 } else { tile + pieces.x };
         let scale = if vertical { tile_size.y } else { tile_size.x };
@@ -137,8 +143,7 @@ fn outline_vertices(
 fn triangulate(polygons: &Vec<Vec<JigsawVertex>>) -> Vec<Mesh> {
     polygons
         .into_iter()
-        .enumerate()
-        .map(|(i, polygon)| {
+        .map(|polygon| {
             let flat_polygon: Vec<f32> = polygon
                 .iter()
                 .flat_map(|v| [v.a_pos.x, v.a_pos.y])
