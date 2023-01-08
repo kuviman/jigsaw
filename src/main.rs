@@ -24,6 +24,8 @@ struct Opt {
     pub room: Option<String>,
     #[clap(long)]
     pub splits: Option<usize>,
+    #[clap(long)]
+    pub room_config: Option<std::path::PathBuf>,
 }
 
 fn main() {
@@ -64,19 +66,35 @@ fn main() {
             title: "LD 52".to_owned(),
             ..default()
         });
-        geng::run(
-            &geng,
-            splitscreen::SplitScreen::new(
+        if let Some(config) = &opt.room_config {
+            let config: RoomConfig =
+                serde_json::from_reader(std::fs::File::open(config).unwrap()).unwrap();
+            futures::executor::block_on(async {
+                let mut con: geng::net::client::Connection<ServerMessage, ClientMessage> =
+                    geng::net::client::connect(opt.connect.as_deref().unwrap()).await;
+                con.send(ClientMessage::CreateRoom(config));
+                match con.next().await {
+                    Some(ServerMessage::RoomCreated(name)) => {
+                        opt.room = Some(name);
+                    }
+                    _ => unreachable!(),
+                }
+            });
+        }
+        if let Some(room) = &opt.room {
+            geng::run(
                 &geng,
-                (0..opt.splits.unwrap_or(1)).map(|_| {
-                    Box::new(game::run(
-                        &geng,
-                        opt.connect.as_deref().unwrap(),
-                        opt.room.clone(),
-                    )) as Box<dyn geng::State>
-                }),
-            ),
-        );
+                splitscreen::SplitScreen::new(
+                    &geng,
+                    (0..opt.splits.unwrap_or(1)).map(|_| {
+                        Box::new(game::run(&geng, opt.connect.as_deref().unwrap(), room))
+                            as Box<dyn geng::State>
+                    }),
+                ),
+            );
+        } else {
+            todo!("Room creation menu")
+        }
 
         #[cfg(not(target_arch = "wasm32"))]
         if let Some((server_handle, server_thread)) = server {

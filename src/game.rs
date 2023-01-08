@@ -17,9 +17,9 @@ struct Player {
 
 struct Game {
     geng: Geng,
+    room_config: RoomConfig,
     assets: Rc<Assets>,
     id: Id,
-    room: String,
     connection: Connection,
     players: Collection<Player>,
     camera: Camera2d,
@@ -32,14 +32,13 @@ impl Game {
         geng: &Geng,
         assets: &Rc<Assets>,
         id: Id,
-        room: String,
+        room_config: RoomConfig,
         connection: Connection,
     ) -> Self {
         Self {
             geng: geng.clone(),
             assets: assets.clone(),
             id,
-            room,
             connection,
             players: Collection::new(),
             camera: Camera2d {
@@ -49,16 +48,17 @@ impl Game {
             },
             framebuffer_size: vec2(1, 1),
             jigsaw: {
-                let size = assets.puzzle.size().map(|x| x as f32);
+                let image = &assets.images[room_config.image];
+                let size = image.size().map(|x| x as f32);
                 let size = size * 5.0 / size.y;
                 let seed = thread_rng().gen(); // TODO: get from the room
-                let mut jigsaw =
-                    Jigsaw::generate(geng.ugli(), seed, size, size.map(|x| x.floor() as usize));
+                let mut jigsaw = Jigsaw::generate(geng.ugli(), seed, size, room_config.size);
                 for tile in &mut jigsaw.tiles {
                     tile.pos -= size / 2.0;
                 }
                 jigsaw
             },
+            room_config,
         }
     }
     fn get_player(&mut self, id: Id) -> &mut Player {
@@ -75,6 +75,8 @@ impl Game {
         while let Some(message) = self.connection.try_recv() {
             match message {
                 ServerMessage::SetupId(..) => unreachable!(),
+                ServerMessage::RoomNotFound => unreachable!(),
+                ServerMessage::RoomCreated(..) => unreachable!(),
                 ServerMessage::UpdatePos(id, pos) => {
                     self.get_player(id)
                         .interpolation
@@ -209,7 +211,7 @@ impl geng::State for Game {
                 (
                     ugli::uniforms! {
                         u_model_matrix: matrix,
-                        u_texture: &self.assets.puzzle,
+                        u_texture: &self.assets.images[self.room_config.image],
                     },
                     geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
                 ),
@@ -262,9 +264,10 @@ impl geng::State for Game {
     }
 }
 
-pub fn run(geng: &Geng, addr: &str, room: Option<String>) -> impl geng::State {
+pub fn run(geng: &Geng, addr: &str, room: &str) -> impl geng::State {
     let future = {
         let geng = geng.clone();
+        let room = room.to_owned();
         let connection = geng::net::client::connect(addr);
         async move {
             let assets: Rc<Assets> = geng::LoadAsset::load(&geng, &run_dir().join("assets"))
@@ -272,10 +275,13 @@ pub fn run(geng: &Geng, addr: &str, room: Option<String>) -> impl geng::State {
                 .expect("Failed to load assets");
             let mut connection: game::Connection = connection.await;
             connection.send(ClientMessage::SelectRoom(room));
-            let Some(ServerMessage::SetupId(id, room)) = connection.next().await else {
-            panic!()
-        };
-            game::Game::new(&geng, &assets, id, room, connection)
+            match connection.next().await {
+                Some(ServerMessage::SetupId(id, room_config)) => {
+                    game::Game::new(&geng, &assets, id, room_config, connection)
+                }
+                Some(ServerMessage::RoomNotFound) => panic!("Room not found"),
+                _ => unreachable!(),
+            }
         }
     };
     geng::LoadingScreen::new(&geng, geng::EmptyLoadingScreen, future, |state| state)

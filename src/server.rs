@@ -34,16 +34,19 @@ fn create_room() -> String {
 struct State {
     id_gen: IdGen,
     players: Collection<Player>,
-    rooms: HashMap<String, Room>,
+    rooms: Collection<Room>,
 }
 
 struct JigsawTile {
     grabbed_by: Option<Id>,
 }
 
+#[derive(HasId)]
 struct Room {
+    #[has_id(id)]
     name: String,
     tiles: Vec<JigsawTile>,
+    config: RoomConfig,
 }
 
 impl State {
@@ -51,12 +54,28 @@ impl State {
         Self {
             id_gen: IdGen::new(),
             players: Collection::new(),
-            rooms: HashMap::new(),
+            rooms: Collection::new(),
         }
     }
     fn handle(&mut self, id: Id, message: ClientMessage) {
         let room = self.players.get(&id).unwrap().room.clone();
         match message {
+            ClientMessage::CreateRoom(config) => loop {
+                let name = create_room();
+                if self.rooms.get(&name).is_some() {
+                    warn!("Rng room name collision");
+                    continue;
+                } else {
+                    let player = self.players.get_mut(&id).unwrap();
+                    self.rooms.insert(Room {
+                        name: name.clone(),
+                        tiles: default(),
+                        config,
+                    });
+                    player.sender.send(ServerMessage::RoomCreated(name));
+                    break;
+                }
+            },
             ClientMessage::UpdatePos(pos) => {
                 for player in &mut self.players {
                     if player.id != id && player.room == room {
@@ -66,10 +85,14 @@ impl State {
             }
             ClientMessage::SelectRoom(room) => {
                 let player = self.players.get_mut(&id).unwrap();
-                player.room = room.unwrap_or_else(create_room);
-                player
-                    .sender
-                    .send(ServerMessage::SetupId(id, player.room.clone()));
+                if let Some(room) = self.rooms.get(&room) {
+                    player.room = room.name.clone();
+                    player
+                        .sender
+                        .send(ServerMessage::SetupId(id, room.config.clone()));
+                } else {
+                    player.sender.send(ServerMessage::RoomNotFound);
+                }
             }
             ClientMessage::GrabTile(tile_id) => {
                 if let Some(room) = self.rooms.get_mut(&room) {

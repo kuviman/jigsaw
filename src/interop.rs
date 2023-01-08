@@ -5,7 +5,9 @@ pub struct Id(pub u64);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ServerMessage {
-    SetupId(Id, String),
+    SetupId(Id, RoomConfig),
+    RoomNotFound,
+    RoomCreated(String),
     PlayerDisconnected(Id),
     UpdatePos(Id, Vec2<f32>),
     TileGrabbed { player: Id, tile: usize },
@@ -15,9 +17,17 @@ pub enum ServerMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientMessage {
-    SelectRoom(Option<String>),
+    CreateRoom(RoomConfig),
+    SelectRoom(String),
     UpdatePos(Vec2<f32>),
     GrabTile(usize),
     ReleaseTile(usize),
     ConnectTiles(usize, usize),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoomConfig {
+    pub seed: u64,
+    pub size: Vec2<usize>,
+    pub image: usize,
 }

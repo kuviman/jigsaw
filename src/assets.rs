@@ -3,7 +3,8 @@ use super::*;
 #[derive(geng::Assets)]
 pub struct Assets {
     pub shaders: Shaders,
-    pub puzzle: ugli::Texture,
+    #[asset(range = "1..=1", path = "images/*.png")]
+    pub images: Vec<ugli::Texture>,
 }
 
 #[derive(geng::Assets)]
