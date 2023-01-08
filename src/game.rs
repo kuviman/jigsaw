@@ -27,6 +27,7 @@ struct Game {
     camera: Camera2d,
     framebuffer_size: Vec2<usize>,
     jigsaw: Jigsaw,
+    bounds: AABB<f32>,
     dragging: Option<Dragging>,
 }
 
@@ -49,6 +50,15 @@ impl Game {
         room_config: RoomConfig,
         connection: Connection,
     ) -> Self {
+        let image = &assets.images[room_config.image];
+        let size = image.size().map(|x| x as f32);
+        let size = size * 5.0 / size.y;
+        let seed = room_config.seed;
+        let mut jigsaw = Jigsaw::generate(geng.ugli(), seed, size, room_config.size);
+        for tile in &mut jigsaw.tiles {
+            tile.interpolated
+                .teleport(tile.interpolated.get() - size / 2.0, Vec2::ZERO);
+        }
         Self {
             geng: geng.clone(),
             assets: assets.clone(),
@@ -62,18 +72,8 @@ impl Game {
             },
             framebuffer_size: vec2(1, 1),
             dragging: None,
-            jigsaw: {
-                let image = &assets.images[room_config.image];
-                let size = image.size().map(|x| x as f32);
-                let size = size * 5.0 / size.y;
-                let seed = room_config.seed;
-                let mut jigsaw = Jigsaw::generate(geng.ugli(), seed, size, room_config.size);
-                for tile in &mut jigsaw.tiles {
-                    tile.interpolated
-                        .teleport(tile.interpolated.get() - size / 2.0, Vec2::ZERO);
-                }
-                jigsaw
-            },
+            bounds: AABB::ZERO.extend_symmetric(size / 2.0).extend_uniform(3.0),
+            jigsaw,
             room_config,
         }
     }
@@ -223,10 +223,13 @@ impl Game {
         self.dragging = Some(drag);
     }
     fn update_cursor(&mut self, screen_pos: Vec2<f64>) {
-        let cursor_pos = self.camera.screen_to_world(
-            self.framebuffer_size.map(|x| x as f32),
-            screen_pos.map(|x| x as f32),
-        );
+        let cursor_pos = self
+            .camera
+            .screen_to_world(
+                self.framebuffer_size.map(|x| x as f32),
+                screen_pos.map(|x| x as f32),
+            )
+            .clamp_aabb(self.bounds);
         self.connection.send(ClientMessage::UpdatePos(cursor_pos));
         let me = self.get_player(self.id);
         me.interpolation.teleport(cursor_pos, Vec2::ZERO);
@@ -239,10 +242,7 @@ impl Game {
                         dragging.initial_screen_pos.map(|x| x as f32),
                     );
                     let target = initial_camera_pos + from - cursor_pos;
-                    let bounds = AABB::points_bounding_box(
-                        self.jigsaw.tiles.iter().map(|tile| tile.interpolated.get()),
-                    );
-                    self.camera.center = target.clamp_aabb(bounds);
+                    self.camera.center = target.clamp_aabb(self.bounds);
                 }
             }
         }
@@ -281,7 +281,13 @@ impl geng::State for Game {
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
-        ugli::clear(framebuffer, Some(Rgba::new(0.1, 0.1, 0.1, 1.0)), None, None);
+        ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
+
+        self.geng.draw_2d(
+            framebuffer,
+            &self.camera,
+            &draw_2d::Quad::new(self.bounds, Rgba::new(0.1, 0.1, 0.1, 1.0)),
+        );
 
         for tile in &self.jigsaw.tiles {
             let matrix = tile.matrix();
