@@ -17,6 +17,7 @@ pub struct Jigsaw {
 
 pub struct JigsawTile {
     pub interpolated: Interpolated<Vec2<f32>>,
+    pub last_interaction_time: f32,
     pub grabbed_by: Option<Id>,
     pub connected_to: Vec<usize>,
     pub puzzle_pos: Vec2<usize>,
@@ -39,6 +40,7 @@ impl Jigsaw {
                             puzzle_pos.map(|x| x as f32 + 0.5) * tile_size,
                             Vec2::ZERO,
                         ),
+                        last_interaction_time: 0.0,
                         grabbed_by: None,
                         connected_to: vec![],
                         puzzle_pos,

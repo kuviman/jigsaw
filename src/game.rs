@@ -30,6 +30,7 @@ struct Game {
     bounds: AABB<f32>,
     dragging: Option<Dragging>,
     intro_time: f32,
+    time: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +87,7 @@ impl Game {
             jigsaw,
             room_config,
             intro_time: 1.0,
+            time: 0.0,
         }
     }
     fn get_player(&mut self, id: Id) -> &mut Player {
@@ -119,6 +121,7 @@ impl Game {
                 } => {
                     self.players.get_mut(&player).unwrap().tile_grabbed = Some((tile, offset));
                     self.jigsaw.tiles[tile].grabbed_by = Some(player);
+                    self.jigsaw.tiles[tile].last_interaction_time = self.time;
                 }
                 ServerMessage::TileReleased { player, tile, pos } => {
                     let player = self.get_player(player);
@@ -159,6 +162,7 @@ impl Game {
                 let offset = tile.interpolated.get() - pos;
                 player.tile_grabbed = Some((i, offset));
                 tile.grabbed_by = Some(self.id);
+                tile.last_interaction_time = self.time;
                 self.connection
                     .send(ClientMessage::GrabTile { tile: i, offset });
                 break;
@@ -267,7 +271,10 @@ impl Game {
 impl geng::State for Game {
     fn update(&mut self, delta_time: f64) {
         let delta_time = delta_time as f32;
+        self.time += delta_time;
+
         self.handle_connection();
+
         let mut moves = Vec::new();
         for player in &mut self.players {
             player.interpolation.update(delta_time);
@@ -305,7 +312,9 @@ impl geng::State for Game {
             &draw_2d::Quad::new(self.bounds, Rgba::new(0.1, 0.1, 0.1, 1.0)),
         );
 
-        for tile in &self.jigsaw.tiles {
+        let mut tiles: Vec<&_> = self.jigsaw.tiles.iter().collect();
+        tiles.sort_by_key(|tile| r32(tile.last_interaction_time));
+        for tile in tiles {
             let mut matrix = tile.matrix();
             if tile.grabbed_by.is_some() {
                 matrix = matrix * Mat3::scale_uniform(1.2);
