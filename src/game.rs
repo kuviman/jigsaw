@@ -66,7 +66,7 @@ impl Game {
                 let image = &assets.images[room_config.image];
                 let size = image.size().map(|x| x as f32);
                 let size = size * 5.0 / size.y;
-                let seed = thread_rng().gen(); // TODO: get from the room
+                let seed = room_config.seed;
                 let mut jigsaw = Jigsaw::generate(geng.ugli(), seed, size, room_config.size);
                 for tile in &mut jigsaw.tiles {
                     tile.interpolated
