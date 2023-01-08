@@ -29,6 +29,7 @@ struct Game {
     jigsaw: Jigsaw,
     bounds: AABB<f32>,
     dragging: Option<Dragging>,
+    play_connect_sound: bool,
     intro_time: f32,
     time: f32,
 }
@@ -83,6 +84,7 @@ impl Game {
             },
             framebuffer_size: vec2(1, 1),
             dragging: None,
+            play_connect_sound: false,
             bounds,
             jigsaw,
             room_config,
@@ -151,6 +153,7 @@ impl Game {
                         unreachable!()
                     };
                     self.move_tile(a, pos, None, false);
+                    self.play_connect_sound = true;
                 }
             }
         }
@@ -274,6 +277,10 @@ impl geng::State for Game {
         self.time += delta_time;
 
         self.handle_connection();
+
+        if std::mem::take(&mut self.play_connect_sound) {
+            self.assets.sounds.connect_piece.play();
+        }
 
         let mut moves = Vec::new();
         for player in &mut self.players {
