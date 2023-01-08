@@ -261,11 +261,7 @@ impl geng::State for Game {
     }
 }
 
-pub fn run(addr: &str, room: Option<String>) {
-    let geng = Geng::new_with(geng::ContextOptions {
-        title: "LD 52".to_owned(),
-        ..default()
-    });
+pub fn run(geng: &Geng, addr: &str, room: Option<String>) -> impl geng::State {
     let future = {
         let geng = geng.clone();
         let connection = geng::net::client::connect(addr);
@@ -276,13 +272,10 @@ pub fn run(addr: &str, room: Option<String>) {
             let mut connection: game::Connection = connection.await;
             connection.send(ClientMessage::SelectRoom(room));
             let Some(ServerMessage::SetupId(id, room)) = connection.next().await else {
-                panic!()
-            };
+            panic!()
+        };
             game::Game::new(&geng, &assets, id, room, connection)
         }
     };
-    geng::run(
-        &geng,
-        geng::LoadingScreen::new(&geng, geng::EmptyLoadingScreen, future, |state| state),
-    );
+    geng::LoadingScreen::new(&geng, geng::EmptyLoadingScreen, future, |state| state)
 }

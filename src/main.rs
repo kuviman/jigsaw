@@ -7,6 +7,7 @@ mod interpolation;
 mod jigsaw;
 #[cfg(not(target_arch = "wasm32"))]
 mod server;
+mod splitscreen;
 mod util;
 
 use assets::Assets;
@@ -21,6 +22,8 @@ struct Opt {
     pub connect: Option<String>,
     #[clap(long)]
     pub room: Option<String>,
+    #[clap(long)]
+    pub splits: Option<usize>,
 }
 
 fn main() {
@@ -57,7 +60,23 @@ fn main() {
             None
         };
 
-        game::run(opt.connect.as_deref().unwrap(), opt.room.clone());
+        let geng = Geng::new_with(geng::ContextOptions {
+            title: "LD 52".to_owned(),
+            ..default()
+        });
+        geng::run(
+            &geng,
+            splitscreen::SplitScreen::new(
+                &geng,
+                (0..opt.splits.unwrap_or(1)).map(|_| {
+                    Box::new(game::run(
+                        &geng,
+                        opt.connect.as_deref().unwrap(),
+                        opt.room.clone(),
+                    )) as Box<dyn geng::State>
+                }),
+            ),
+        );
 
         #[cfg(not(target_arch = "wasm32"))]
         if let Some((server_handle, server_thread)) = server {
