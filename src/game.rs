@@ -29,6 +29,7 @@ struct Game {
     jigsaw: Jigsaw,
     bounds: AABB<f32>,
     dragging: Option<Dragging>,
+    intro_time: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -55,9 +56,18 @@ impl Game {
         let size = size * 5.0 / size.y;
         let seed = room_config.seed;
         let mut jigsaw = Jigsaw::generate(geng.ugli(), seed, size, room_config.size);
+        let mut rng = rand::prelude::StdRng::seed_from_u64(seed);
+        let bounds = AABB::ZERO.extend_symmetric(size / 2.0).extend_uniform(3.0);
+        let spawn_area =
+            AABB::point(bounds.bottom_left()).extend_positive(vec2(bounds.width(), 3.0));
         for tile in &mut jigsaw.tiles {
             tile.interpolated
                 .teleport(tile.interpolated.get() - size / 2.0, Vec2::ZERO);
+            let pos = vec2(
+                rng.gen_range(spawn_area.x_min..=spawn_area.x_max),
+                rng.gen_range(spawn_area.y_min..=spawn_area.y_max),
+            );
+            tile.interpolated.server_update(pos, Vec2::ZERO);
         }
         Self {
             geng: geng.clone(),
@@ -72,9 +82,10 @@ impl Game {
             },
             framebuffer_size: vec2(1, 1),
             dragging: None,
-            bounds: AABB::ZERO.extend_symmetric(size / 2.0).extend_uniform(3.0),
+            bounds,
             jigsaw,
             room_config,
+            intro_time: 1.0,
         }
     }
     fn get_player(&mut self, id: Id) -> &mut Player {
@@ -275,8 +286,12 @@ impl geng::State for Game {
             self.move_tile(tile, pos, None, true);
         }
 
-        for tile in &mut self.jigsaw.tiles {
-            tile.interpolated.update(delta_time);
+        if self.intro_time > 0.0 {
+            self.intro_time -= delta_time;
+        } else {
+            for tile in &mut self.jigsaw.tiles {
+                tile.interpolated.update(delta_time);
+            }
         }
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
