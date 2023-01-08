@@ -39,16 +39,19 @@ fn jigsaw(seed: u64, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
     let vertical_edges = pieces.y * (pieces.x - 1);
     let edges_count = vertical_edges + pieces.x * (pieces.y - 1);
     let mut rng = rand::prelude::StdRng::seed_from_u64(seed);
-    // (x - 0.1)^2 + (y - 0.15)^2 = 0.025
-    let knob = vec![
-        vec2(0.0, 0.0275),
-        vec2(-0.058, 0.144),
-        vec2(0.0, 0.2725),
-        vec2(0.1, 0.3081),
-        vec2(0.2, 0.2725),
-        vec2(0.258, 0.144),
-        vec2(0.2, 0.0275),
-    ];
+    let knob: Vec<Vec2<f32>> = {
+        const KNOB_RESOLUTION: usize = 10;
+        const MIN: f32 = 3.95;
+        const MAX: f32 = -0.85;
+        (0..KNOB_RESOLUTION)
+            .map(|i| {
+                let t = i as f32 / (KNOB_RESOLUTION as f32 - 1.0) * (MAX - MIN) + MIN;
+                let (sin, cos) = t.sin_cos();
+                // (x - 0.1)^2 + (y - 0.15)^2 = 0.025
+                vec2(0.1 + cos * 0.15, 0.15 + sin * 0.15)
+            })
+            .collect()
+    };
     let mut edges: Vec<Vec<Vec2<f32>>> = (0..edges_count)
         .map(|i| {
             let t = i as f32 / (edges_count as f32 - 1.0);
