@@ -32,6 +32,7 @@ struct Game {
     play_connect_sound: bool,
     intro_time: f32,
     time: f32,
+    hovered_tile: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -84,6 +85,7 @@ impl Game {
             },
             framebuffer_size: vec2(1, 1),
             dragging: None,
+            hovered_tile: None,
             play_connect_sound: false,
             bounds,
             jigsaw,
@@ -170,6 +172,7 @@ impl Game {
                 for tile in self.jigsaw.get_all_connected(i) {
                     self.jigsaw.tiles[tile].last_interaction_time = self.time;
                 }
+                self.assets.sounds.grab.play();
                 self.connection
                     .send(ClientMessage::GrabTile { tile: i, offset });
                 break;
@@ -180,6 +183,7 @@ impl Game {
         self.stop_drag();
         let player = self.players.get_mut(&self.id).unwrap();
         if let Some((tile_id, _)) = player.tile_grabbed.take() {
+            self.assets.sounds.grab.play();
             self.connection.send(ClientMessage::ReleaseTile(
                 tile_id,
                 player.interpolation.get(),
@@ -258,6 +262,7 @@ impl Game {
         me.interpolation.teleport(cursor_pos, Vec2::ZERO);
 
         if let Some(dragging) = &mut self.dragging {
+            self.hovered_tile = None;
             match dragging.target {
                 DragTarget::Camera { initial_camera_pos } => {
                     let from = self.camera.screen_to_world(
@@ -268,6 +273,20 @@ impl Game {
                     self.camera.center = target.clamp_aabb(self.bounds);
                 }
             }
+        } else if let Some(hovered) = 'block: {
+            for (i, tile) in self.jigsaw.tiles.iter().enumerate().rev() {
+                if tile.contains(cursor_pos) {
+                    break 'block Some(i);
+                }
+            }
+            None
+        } {
+            if Some(hovered) != self.hovered_tile {
+                self.hovered_tile = Some(hovered);
+                // self.assets.sounds.hover.play();
+            }
+        } else {
+            self.hovered_tile = None;
         }
     }
     fn stop_drag(&mut self) {
@@ -341,6 +360,11 @@ impl geng::State for Game {
                     * self.jigsaw.tile_size;
                 matrix = connected_to.matrix() * Mat3::scale_uniform(1.2) * Mat3::translate(delta);
             }
+            let outline_color = if Some(i) == self.hovered_tile {
+                Rgba::WHITE
+            } else {
+                Rgba::BLACK
+            };
             ugli::draw(
                 framebuffer,
                 &self.assets.shaders.outline,
@@ -349,7 +373,7 @@ impl geng::State for Game {
                 (
                     ugli::uniforms! {
                         u_model_matrix: matrix,
-                        u_color: Rgba::BLACK,
+                        u_color: outline_color,
                     },
                     geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
                 ),
@@ -386,7 +410,7 @@ impl geng::State for Game {
     fn handle_event(&mut self, event: geng::Event) {
         match event {
             geng::Event::Wheel { delta } => {
-                const SENSITIVITY: f32 = 0.1;
+                const SENSITIVITY: f32 = 0.02;
                 self.camera.fov =
                     (self.camera.fov - delta as f32 * SENSITIVITY).clamp(FOV_MIN, FOV_MAX);
             }

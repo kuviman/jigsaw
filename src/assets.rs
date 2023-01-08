@@ -17,4 +17,5 @@ pub struct Shaders {
 #[derive(geng::Assets)]
 pub struct Sounds {
     pub connect_piece: geng::Sound,
+    pub grab: geng::Sound,
 }
