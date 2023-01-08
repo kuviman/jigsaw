@@ -12,7 +12,7 @@ type Connection = geng::net::client::Connection<ServerMessage, ClientMessage>;
 struct Player {
     id: Id,
     interpolation: Interpolated<Vec2<f32>>,
-    tile_grabbed: Option<usize>,
+    tile_grabbed: Option<(usize, Vec2<f32>)>,
 }
 
 struct Game {
@@ -85,14 +85,24 @@ impl Game {
                 ServerMessage::PlayerDisconnected(id) => {
                     self.players.remove(&id);
                 }
-                ServerMessage::TileGrabbed { player, tile } => {
-                    self.players.get_mut(&player).unwrap().tile_grabbed = Some(tile);
+                ServerMessage::TileGrabbed {
+                    player,
+                    tile,
+                    offset,
+                } => {
+                    self.players.get_mut(&player).unwrap().tile_grabbed = Some((tile, offset));
                     self.jigsaw.tiles[tile].grabbed_by = Some(player);
                 }
                 ServerMessage::TileReleased { player, tile, pos } => {
-                    self.players.get_mut(&player).unwrap().tile_grabbed = None;
+                    let offset = self
+                        .players
+                        .get_mut(&player)
+                        .unwrap()
+                        .tile_grabbed
+                        .take()
+                        .map_or(Vec2::ZERO, |(_, offset)| offset);
                     self.jigsaw.tiles[tile].grabbed_by = None;
-                    self.move_tile(tile, pos);
+                    self.move_tile(tile, pos + offset);
                 }
                 ServerMessage::ConnectTiles(a, b) => {
                     self.jigsaw.tiles[a].connected_to.push(b);
@@ -118,15 +128,18 @@ impl Game {
     fn click(&mut self, pos: Vec2<f32>) {
         for (i, tile) in self.jigsaw.tiles.iter_mut().enumerate() {
             if tile.contains(pos) {
-                self.players.get_mut(&self.id).unwrap().tile_grabbed = Some(i);
+                let player = self.players.get_mut(&self.id).unwrap();
+                let offset = tile.pos - pos;
+                player.tile_grabbed = Some((i, offset));
                 tile.grabbed_by = Some(self.id);
-                self.connection.send(ClientMessage::GrabTile(i));
+                self.connection
+                    .send(ClientMessage::GrabTile { tile: i, offset });
             }
         }
     }
     fn release(&mut self) {
         let player = self.players.get_mut(&self.id).unwrap();
-        if let Some(tile_id) = player.tile_grabbed.take() {
+        if let Some((tile_id, _)) = player.tile_grabbed.take() {
             self.connection.send(ClientMessage::ReleaseTile(
                 tile_id,
                 player.interpolation.get(),
@@ -190,12 +203,12 @@ impl geng::State for Game {
             player.interpolation.update(delta_time);
 
             // Update grabbed tile
-            if let Some(tile_id) = player.tile_grabbed {
+            if let Some((tile_id, offset)) = player.tile_grabbed {
                 if let Some(tile) = self.jigsaw.tiles.get_mut(tile_id) {
                     if tile.grabbed_by != Some(player.id) {
                         player.tile_grabbed = None;
                     } else {
-                        moves.push((tile_id, player.interpolation.get()));
+                        moves.push((tile_id, player.interpolation.get() + offset));
                     }
                 }
             }

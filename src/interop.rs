@@ -13,6 +13,7 @@ pub enum ServerMessage {
     TileGrabbed {
         player: Id,
         tile: usize,
+        offset: Vec2<f32>,
     },
     TileReleased {
         player: Id,
@@ -27,7 +28,7 @@ pub enum ClientMessage {
     CreateRoom(RoomConfig),
     SelectRoom(String),
     UpdatePos(Vec2<f32>),
-    GrabTile(usize),
+    GrabTile { tile: usize, offset: Vec2<f32> },
     ReleaseTile(usize, Vec2<f32>),
     ConnectTiles(usize, usize),
 }

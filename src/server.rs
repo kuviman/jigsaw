@@ -95,16 +95,20 @@ impl State {
                     player.sender.send(ServerMessage::RoomNotFound);
                 }
             }
-            ClientMessage::GrabTile(tile_id) => {
+            ClientMessage::GrabTile {
+                tile: tile_id,
+                offset,
+            } => {
                 if let Some(room) = self.rooms.get_mut(&room) {
                     if let Some(tile) = room.tiles.get_mut(tile_id) {
                         if tile.grabbed_by.is_none() {
                             tile.grabbed_by = Some(id);
                             for player in &mut self.players {
-                                if player.room == room.name {
+                                if player.id != id && player.room == room.name {
                                     player.sender.send(ServerMessage::TileGrabbed {
                                         player: id,
                                         tile: tile_id,
+                                        offset,
                                     });
                                 }
                             }
@@ -117,7 +121,7 @@ impl State {
                     if let Some(tile) = room.tiles.get_mut(tile_id) {
                         if tile.grabbed_by.take() == Some(id) {
                             for player in &mut self.players {
-                                if player.room == room.name {
+                                if player.id != id && player.room == room.name {
                                     player.sender.send(ServerMessage::TileReleased {
                                         player: id,
                                         tile: tile_id,
