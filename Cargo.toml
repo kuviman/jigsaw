@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 earcutr = "0.4.1"
-geng = { git = "https://github.com/kuviman/geng" }
+geng = { git = "https://github.com/kuviman/geng", branch = "refdoc" }
 serde = "1"
