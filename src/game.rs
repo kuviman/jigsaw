@@ -123,7 +123,9 @@ impl Game {
                 } => {
                     self.players.get_mut(&player).unwrap().tile_grabbed = Some((tile, offset));
                     self.jigsaw.tiles[tile].grabbed_by = Some(player);
-                    self.jigsaw.tiles[tile].last_interaction_time = self.time;
+                    for tile in self.jigsaw.get_all_connected(tile) {
+                        self.jigsaw.tiles[tile].last_interaction_time = self.time;
+                    }
                 }
                 ServerMessage::TileReleased { player, tile, pos } => {
                     let player = self.get_player(player);
@@ -165,7 +167,9 @@ impl Game {
                 let offset = tile.interpolated.get() - pos;
                 player.tile_grabbed = Some((i, offset));
                 tile.grabbed_by = Some(self.id);
-                tile.last_interaction_time = self.time;
+                for tile in self.jigsaw.get_all_connected(i) {
+                    self.jigsaw.tiles[tile].last_interaction_time = self.time;
+                }
                 self.connection
                     .send(ClientMessage::GrabTile { tile: i, offset });
                 break;
@@ -319,12 +323,23 @@ impl geng::State for Game {
             &draw_2d::Quad::new(self.bounds, Rgba::new(0.1, 0.1, 0.1, 1.0)),
         );
 
-        let mut tiles: Vec<&_> = self.jigsaw.tiles.iter().collect();
-        tiles.sort_by_key(|tile| r32(tile.last_interaction_time));
-        for tile in tiles {
-            let mut matrix = tile.matrix();
+        let mut tiles: Vec<_> = self.jigsaw.tiles.iter().enumerate().collect();
+        tiles.sort_by_key(|(_, tile)| r32(tile.last_interaction_time));
+        let mut grabbed_tiles = HashMap::new();
+        for (i, tile) in self.jigsaw.tiles.iter().enumerate() {
             if tile.grabbed_by.is_some() {
-                matrix *= Mat3::scale_uniform(1.2);
+                for other in self.jigsaw.get_all_connected(i) {
+                    grabbed_tiles.insert(other, tile);
+                }
+            }
+        }
+        for (i, tile) in tiles {
+            let mut matrix = tile.matrix();
+            if let Some(connected_to) = grabbed_tiles.get(&i) {
+                let delta = (tile.puzzle_pos.map(|x| x as f32)
+                    - connected_to.puzzle_pos.map(|x| x as f32))
+                    * self.jigsaw.tile_size;
+                matrix = connected_to.matrix() * Mat3::scale_uniform(1.2) * Mat3::translate(delta);
             }
             ugli::draw(
                 framebuffer,
