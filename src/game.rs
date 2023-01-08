@@ -238,7 +238,11 @@ impl Game {
                         self.framebuffer_size.map(|x| x as f32),
                         dragging.initial_screen_pos.map(|x| x as f32),
                     );
-                    self.camera.center = initial_camera_pos + from - cursor_pos;
+                    let target = initial_camera_pos + from - cursor_pos;
+                    let bounds = AABB::points_bounding_box(
+                        self.jigsaw.tiles.iter().map(|tile| tile.interpolated.get()),
+                    );
+                    self.camera.center = target.clamp_aabb(bounds);
                 }
             }
         }
