@@ -91,8 +91,8 @@ impl Game {
                 }
                 ServerMessage::TileReleased { player, tile, pos } => {
                     self.players.get_mut(&player).unwrap().tile_grabbed = None;
-                    self.jigsaw.tiles[tile].pos = pos;
                     self.jigsaw.tiles[tile].grabbed_by = None;
+                    self.move_tile(tile, pos);
                 }
                 ServerMessage::ConnectTiles(a, b) => {
                     self.jigsaw.tiles[a].connected_to.push(b);
@@ -135,34 +135,37 @@ impl Game {
             tile.grabbed_by = None;
 
             // Try to connect
-            let tile = self.jigsaw.tiles.get(tile_id).unwrap();
-            let pos = tile.pos;
-            let puzzle_pos = tile.puzzle_pos;
-            for (i, other) in self.jigsaw.tiles.iter().enumerate() {
-                if tile.connected_to.contains(&i) {
-                    continue;
-                }
-                let delta = puzzle_pos.map(|x| x as i32) - other.puzzle_pos.map(|x| x as i32);
-                let delta = if delta.x == 0 && delta.y.abs() == 1 {
-                    // Tile is adjacent vertically
-                    Some(
-                        pos - other.pos
-                            - vec2(0.0, self.jigsaw.tile_size.y * delta.y.signum() as f32),
-                    )
-                } else if delta.y == 0 && delta.x.abs() == 1 {
-                    // Tile is adjacent horizontally
-                    Some(
-                        pos - other.pos
-                            - vec2(self.jigsaw.tile_size.x * delta.x.signum() as f32, 0.0),
-                    )
-                } else {
-                    None
-                };
-                if let Some(delta) = delta {
-                    // Delta to the snap position
-                    if delta.len() <= SNAP_DISTANCE {
-                        self.connection
-                            .send(ClientMessage::ConnectTiles(tile_id, i));
+            let connected = self.jigsaw.get_all_connected(tile_id);
+            for tile_id in connected {
+                let tile = self.jigsaw.tiles.get(tile_id).unwrap();
+                let pos = tile.pos;
+                let puzzle_pos = tile.puzzle_pos;
+                for (i, other) in self.jigsaw.tiles.iter().enumerate() {
+                    if tile.connected_to.contains(&i) {
+                        continue;
+                    }
+                    let delta = puzzle_pos.map(|x| x as i32) - other.puzzle_pos.map(|x| x as i32);
+                    let delta = if delta.x == 0 && delta.y.abs() == 1 {
+                        // Tile is adjacent vertically
+                        Some(
+                            pos - other.pos
+                                - vec2(0.0, self.jigsaw.tile_size.y * delta.y.signum() as f32),
+                        )
+                    } else if delta.y == 0 && delta.x.abs() == 1 {
+                        // Tile is adjacent horizontally
+                        Some(
+                            pos - other.pos
+                                - vec2(self.jigsaw.tile_size.x * delta.x.signum() as f32, 0.0),
+                        )
+                    } else {
+                        None
+                    };
+                    if let Some(delta) = delta {
+                        // Delta to the snap position
+                        if delta.len() <= SNAP_DISTANCE {
+                            self.connection
+                                .send(ClientMessage::ConnectTiles(tile_id, i));
+                        }
                     }
                 }
             }
