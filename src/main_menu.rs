@@ -16,7 +16,7 @@ impl ConfigScreen {
             geng: geng.clone(),
             config: RoomConfig {
                 seed: thread_rng().gen(),
-                size: vec2(100, 1), // LUL
+                size: vec2(30, 1), // LUL
                 image: 0,
             },
             transition: None,
@@ -58,6 +58,7 @@ impl geng::State for ConfigScreen {
                         Some(ServerMessage::RoomCreated(name)) => name,
                         _ => unreachable!(),
                     };
+                    info!("room: {:?}", room);
                     game::run(&geng, &addr, &room)
                 }
             };
@@ -74,14 +75,13 @@ impl geng::State for ConfigScreen {
         let difficulty_button =
             Button::new(cx, &format!("Difficulty: {} pieces", self.config.size.x));
         if difficulty_button.was_clicked() {
-            self.config.size.x = match self.config.size.x {
-                30 => 100,
-                100 => 500,
-                500 => 1000,
-                1000 => 3000,
-                3000 => 30,
-                _ => unreachable!(),
-            }
+            let options = [30, 120, 500, 1000];
+            self.config.size.x = options[(options
+                .iter()
+                .position(|x| *x == self.config.size.x)
+                .unwrap()
+                + 1)
+                % options.len()];
         }
         (
             image_button.center(),
