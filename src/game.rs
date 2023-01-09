@@ -160,21 +160,28 @@ impl Game {
             }
         }
     }
+    fn hovered_tile(&self, pos: Vec2<f32>) -> Option<usize> {
+        self.jigsaw
+            .tiles
+            .iter()
+            .enumerate()
+            .filter(|(_, tile)| tile.contains(pos))
+            .max_by_key(|(_, tile)| r32(tile.last_interaction_time))
+            .map(|(i, _)| i)
+    }
     fn click(&mut self, pos: Vec2<f32>) {
-        for (i, tile) in self.jigsaw.tiles.iter_mut().enumerate() {
-            if tile.contains(pos) {
-                let player = self.players.get_mut(&self.id).unwrap();
-                let offset = tile.interpolated.get() - pos;
-                player.tile_grabbed = Some((i, offset));
-                tile.grabbed_by = Some(self.id);
-                for tile in self.jigsaw.get_all_connected(i) {
-                    self.jigsaw.tiles[tile].last_interaction_time = self.time;
-                }
-                self.assets.sounds.grab.play();
-                self.connection
-                    .send(ClientMessage::GrabTile { tile: i, offset });
-                break;
+        if let Some(i) = self.hovered_tile(pos) {
+            let tile = self.jigsaw.tiles.get_mut(i).unwrap();
+            let player = self.players.get_mut(&self.id).unwrap();
+            let offset = tile.interpolated.get() - pos;
+            player.tile_grabbed = Some((i, offset));
+            tile.grabbed_by = Some(self.id);
+            for tile in self.jigsaw.get_all_connected(i) {
+                self.jigsaw.tiles[tile].last_interaction_time = self.time;
             }
+            self.assets.sounds.grab.play();
+            self.connection
+                .send(ClientMessage::GrabTile { tile: i, offset });
         }
     }
     fn release(&mut self) {
@@ -271,14 +278,7 @@ impl Game {
                     self.camera.center = target.clamp_aabb(self.bounds);
                 }
             }
-        } else if let Some(hovered) = 'block: {
-            for (i, tile) in self.jigsaw.tiles.iter().enumerate().rev() {
-                if tile.contains(cursor_pos) {
-                    break 'block Some(i);
-                }
-            }
-            None
-        } {
+        } else if let Some(hovered) = self.hovered_tile(cursor_pos) {
             if Some(hovered) != self.hovered_tile {
                 self.hovered_tile = Some(hovered);
                 // self.assets.sounds.hover.play();
