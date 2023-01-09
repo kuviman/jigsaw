@@ -30,7 +30,7 @@ struct Game {
     bounds: AABB<f32>,
     dragging: Option<Dragging>,
     play_connect_sound: bool,
-    intro_time: f32,
+    // intro_time: f32,
     time: f32,
     hovered_tile: Option<usize>,
     customize: bool,
@@ -69,9 +69,10 @@ impl Game {
         for (tile, state) in jigsaw.tiles.iter_mut().zip(tiles) {
             tile.grabbed_by = state.grabbed_by;
             tile.connected_to = state.connections;
-            tile.interpolated
-                .teleport(tile.interpolated.get() - size / 2.0, Vec2::ZERO);
-            tile.interpolated.server_update(state.pos, Vec2::ZERO);
+            // tile.interpolated
+            //     .teleport(tile.interpolated.get() - size / 2.0, Vec2::ZERO);
+            // tile.interpolated.server_update(state.pos, Vec2::ZERO);
+            tile.interpolated.teleport(state.pos, Vec2::ZERO);
         }
         let my_player = Player {
             id,
@@ -106,7 +107,7 @@ impl Game {
             bounds,
             jigsaw,
             room_config,
-            intro_time: 1.0,
+            // intro_time: 1.0,
             time: 0.0,
             finished: false,
         }
@@ -412,13 +413,13 @@ impl geng::State for Game {
             self.move_tile(tile, pos, None, true);
         }
 
-        if self.intro_time > 0.0 {
-            self.intro_time -= delta_time;
-        } else {
-            for tile in &mut self.jigsaw.tiles {
-                tile.interpolated.update(delta_time);
-            }
+        // if self.intro_time > 0.0 {
+        // self.intro_time -= delta_time;
+        // } else {
+        for tile in &mut self.jigsaw.tiles {
+            tile.interpolated.update(delta_time);
         }
+        // }
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
