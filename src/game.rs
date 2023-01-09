@@ -371,7 +371,7 @@ impl geng::State for Game {
                             * Mat3::scale_uniform(1.2)
                             * Mat3::translate(delta);
                     }
-                    let depth = 1.0 - 2.0 * depth_i as f32 / (tiles.len() as f32 - 1.0);
+                    let depth = 1.0 - 2.0 * depth_i as f32 / tiles.len() as f32;
                     tile.mesh.iter().map(move |v| {
                         let pos = matrix * v.a_pos.extend(1.0);
                         let a_pos = (pos.xy() / pos.z).extend(depth);
@@ -412,11 +412,11 @@ impl geng::State for Game {
             } else {
                 Rgba::BLACK
             };
-            let depth = 1.0 - 2.0 * depth_i as f32 / (tiles.len() as f32 - 1.0);
+            let depth = (1.0 - 2.0 * (depth_i as f32 + 0.5) / tiles.len() as f32).clamp_abs(1.0);
             ugli::draw(
                 framebuffer,
                 &self.assets.shaders.outline,
-                ugli::DrawMode::LineLoop { line_width: 2.0 },
+                ugli::DrawMode::LineLoop { line_width: 1.0 },
                 &tile.outline,
                 (
                     ugli::uniforms! {
