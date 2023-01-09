@@ -191,7 +191,11 @@ impl Game {
             .max_by_key(|(_, tile)| r32(tile.last_interaction_time))
             .map(|(i, _)| i)
     }
-    fn click(&mut self, pos: Vec2<f32>) {
+    fn click(&mut self, screen_pos: Vec2<f64>) {
+        let pos = self.camera.screen_to_world(
+            self.framebuffer_size.map(|x| x as f32),
+            screen_pos.map(|x| x as f32),
+        );
         if let Some(i) = self.hovered_tile(pos) {
             let tile = self.jigsaw.tiles.get_mut(i).unwrap();
             let player = self.players.get_mut(&self.id).unwrap();
@@ -204,6 +208,13 @@ impl Game {
             self.assets.sounds.grab.play();
             self.connection
                 .send(ClientMessage::GrabTile { tile: i, offset });
+        } else {
+            self.start_drag(Dragging {
+                initial_screen_pos: screen_pos,
+                target: DragTarget::Camera {
+                    initial_camera_pos: self.camera.center,
+                },
+            });
         }
     }
     fn release(&mut self) {
@@ -527,7 +538,9 @@ impl geng::State for Game {
 
         for player in &self.players {
             let size = self.camera.fov * 0.01;
-            let texture = if player.tile_grabbed.is_some() {
+            let texture = if player.tile_grabbed.is_some()
+                || player.id == self.id && self.dragging.is_some()
+            {
                 &self.assets.hand.grab
             } else {
                 &self.assets.hand.regular
@@ -589,11 +602,7 @@ impl geng::State for Game {
             }
             geng::Event::MouseDown { position, button } => match button {
                 geng::MouseButton::Left => {
-                    let pos = self.camera.screen_to_world(
-                        self.framebuffer_size.map(|x| x as f32),
-                        position.map(|x| x as f32),
-                    );
-                    self.click(pos);
+                    self.click(position);
                 }
                 geng::MouseButton::Right => {
                     self.start_drag(Dragging {
