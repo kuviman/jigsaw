@@ -332,7 +332,7 @@ impl geng::State for Game {
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
-        ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
+        ugli::clear(framebuffer, Some(Rgba::BLACK), Some(1.0), None);
 
         self.geng.draw_2d(
             framebuffer,
@@ -350,19 +350,68 @@ impl geng::State for Game {
                 }
             }
         }
-        for (i, tile) in tiles {
+
+        // Combine all meshes into 1
+        {
+            #[derive(ugli::Vertex)]
+            struct Vertex {
+                a_pos: Vec3<f32>,
+                a_uv: Vec2<f32>,
+            }
+            let mesh: Vec<Vertex> = tiles
+                .iter()
+                .flat_map(|(i, tile)| {
+                    let mut matrix = tile.matrix();
+                    if let Some(connected_to) = grabbed_tiles.get(i) {
+                        let delta = (tile.puzzle_pos.map(|x| x as f32)
+                            - connected_to.puzzle_pos.map(|x| x as f32))
+                            * self.jigsaw.tile_size;
+                        matrix = connected_to.matrix()
+                            * Mat3::scale_uniform(1.2)
+                            * Mat3::translate(delta);
+                    }
+                    let depth = 1.0 - 2.0 * *i as f32 / (tiles.len() as f32 - 1.0);
+                    tile.mesh.iter().map(move |v| {
+                        let pos = matrix * v.a_pos.extend(1.0);
+                        let a_pos = (pos.xy() / pos.z).extend(depth);
+                        Vertex {
+                            a_pos,
+                            a_uv: v.a_uv,
+                        }
+                    })
+                })
+                .collect();
+            let mesh = ugli::VertexBuffer::new_dynamic(self.geng.ugli(), mesh);
+            ugli::draw(
+                framebuffer,
+                &self.assets.shaders.jigsaw,
+                ugli::DrawMode::Triangles,
+                &mesh,
+                (
+                    ugli::uniforms! {
+                        u_model_matrix: Mat3::identity(),
+                        u_texture: &self.assets.images[self.room_config.image],
+                    },
+                    geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
+                ),
+                ugli::DrawParameters::default(),
+            );
+        }
+
+        for (i, tile) in &tiles {
             let mut matrix = tile.matrix();
-            if let Some(connected_to) = grabbed_tiles.get(&i) {
+            if let Some(connected_to) = grabbed_tiles.get(i) {
                 let delta = (tile.puzzle_pos.map(|x| x as f32)
                     - connected_to.puzzle_pos.map(|x| x as f32))
                     * self.jigsaw.tile_size;
                 matrix = connected_to.matrix() * Mat3::scale_uniform(1.2) * Mat3::translate(delta);
             }
-            let outline_color = if Some(i) == self.hovered_tile {
+            let outline_color = if Some(*i) == self.hovered_tile {
                 Rgba::WHITE
             } else {
                 Rgba::BLACK
             };
+            let depth = 1.0 - 2.0 * *i as f32 / (tiles.len() as f32 - 1.0);
             ugli::draw(
                 framebuffer,
                 &self.assets.shaders.outline,
@@ -372,24 +421,15 @@ impl geng::State for Game {
                     ugli::uniforms! {
                         u_model_matrix: matrix,
                         u_color: outline_color,
+                        u_depth: depth,
                     },
                     geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
                 ),
-                ugli::DrawParameters::default(),
-            );
-            ugli::draw(
-                framebuffer,
-                &self.assets.shaders.jigsaw,
-                ugli::DrawMode::Triangles,
-                &tile.mesh,
-                (
-                    ugli::uniforms! {
-                        u_model_matrix: matrix,
-                        u_texture: &self.assets.images[self.room_config.image],
-                    },
-                    geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
-                ),
-                ugli::DrawParameters::default(),
+                ugli::DrawParameters {
+                    blend_mode: Some(ugli::BlendMode::default()),
+                    depth_func: Some(ugli::DepthFunc::Less),
+                    ..Default::default()
+                },
             );
         }
 
