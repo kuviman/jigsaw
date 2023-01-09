@@ -51,7 +51,6 @@ struct Dragging {
 #[derive(Debug, Clone)]
 enum DragTarget {
     Camera { initial_camera_pos: Vec2<f32> },
-    CameraZoom { initial_camera_fov: f32 },
 }
 
 impl Game {
@@ -335,7 +334,6 @@ impl Game {
                     let target = initial_camera_pos + from - cursor_pos;
                     self.camera.center = target.clamp_aabb(self.bounds);
                 }
-                DragTarget::CameraZoom { .. } => {}
             }
         } else if let Some(hovered) = self.hovered_tile(cursor_pos) {
             if Some(hovered) != self.hovered_tile {
@@ -352,13 +350,7 @@ impl Game {
     fn touch(&mut self, touches: Vec<geng::TouchPoint>) {
         match &touches[..] {
             [p] => self.click(p.position),
-            [a, _] => {
-                self.start_drag(Dragging {
-                    initial_screen_pos: a.position,
-                    target: DragTarget::CameraZoom {
-                        initial_camera_fov: self.camera.fov,
-                    },
-                });
+            [_, _] => {
                 self.touch = Some(touches);
             }
             _ => {}
@@ -369,20 +361,11 @@ impl Game {
             [p] => self.update_cursor(p.position),
             [a, b] => {
                 if let Some([a0, b0]) = self.touch.as_deref() {
-                    if let Some(drag) = &self.dragging {
-                        if let DragTarget::CameraZoom { initial_camera_fov } = drag.target {
-                            let [a0, b0, a, b] = [a0, b0, a, b].map(|p| {
-                                self.camera.screen_to_world(
-                                    self.framebuffer_size.map(|x| x as f32),
-                                    p.position.map(|x| x as f32),
-                                )
-                            });
-                            let d0 = (b0 - a0).len();
-                            let d = (b - a).len();
-                            self.camera.fov = (initial_camera_fov + d0 - d).clamp(FOV_MIN, FOV_MAX);
-                        }
-                    }
+                    let d0 = (b0.position - a0.position).len() as f32;
+                    let d = (b.position - a.position).len() as f32;
+                    self.camera.fov /= d / d0;
                 }
+                self.touch = Some(touches);
             }
             _ => {}
         }
