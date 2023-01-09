@@ -90,16 +90,23 @@ fn main() {
             });
         }
         if let Some(room) = &opt.room {
-            geng::run(
-                &geng,
-                splitscreen::SplitScreen::new(
+            if let Some(splits) = opt.splits {
+                geng::run(
                     &geng,
-                    (0..opt.splits.unwrap_or(1)).map(|_| {
-                        Box::new(game::run(&geng, opt.connect.as_deref().unwrap(), room))
-                            as Box<dyn geng::State>
-                    }),
-                ),
-            );
+                    splitscreen::SplitScreen::new(
+                        &geng,
+                        (0..splits).map(|_| {
+                            Box::new(game::run(&geng, opt.connect.as_deref().unwrap(), room))
+                                as Box<dyn geng::State>
+                        }),
+                    ),
+                );
+            } else {
+                geng::run(
+                    &geng,
+                    game::run(&geng, opt.connect.as_deref().unwrap(), room),
+                );
+            }
         } else {
             geng::run(
                 &geng,
