@@ -44,7 +44,7 @@ impl Zero for Vec3<f32> {
     };
 }
 
-const INTERPOLATION_TIME: f32 = 0.5;
+const INTERPOLATION_TIME: f32 = 0.2;
 
 impl<T: Mul<f32, Output = T> + Add<Output = T> + Sub<Output = T> + Copy + Zero> Interpolated<T> {
     pub fn new(p: T, v: T) -> Self {
