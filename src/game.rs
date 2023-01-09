@@ -527,10 +527,15 @@ impl geng::State for Game {
 
         for player in &self.players {
             let size = self.camera.fov * 0.01;
+            let texture = if player.tile_grabbed.is_some() {
+                &self.assets.hand.grab
+            } else {
+                &self.assets.hand.regular
+            };
             self.geng.draw_2d(
                 framebuffer,
                 &self.camera,
-                &draw_2d::TexturedQuad::unit(&self.assets.hand.regular) // TODO grab
+                &draw_2d::TexturedQuad::unit(texture)
                     .scale_uniform(size)
                     .translate(player.interpolation.get()),
             );
