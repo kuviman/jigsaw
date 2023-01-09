@@ -399,7 +399,7 @@ impl geng::State for Game {
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
-        ugli::clear(framebuffer, Some(Rgba::BLACK), Some(1.0), None);
+        ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
 
         if self.customize {
             self.geng
@@ -407,7 +407,16 @@ impl geng::State for Game {
                 .set_cursor_type(geng::CursorType::Default);
             return;
         } else {
-            self.geng.window().set_cursor_type(geng::CursorType::None);
+            self.geng.window().set_cursor_type(
+                if self.bounds.contains(self.camera.screen_to_world(
+                    self.framebuffer_size.map(|x| x as f32),
+                    self.geng.window().mouse_pos().map(|x| x as f32),
+                )) {
+                    geng::CursorType::None
+                } else {
+                    geng::CursorType::Default
+                },
+            );
         }
 
         self.geng.draw_2d(
@@ -415,6 +424,8 @@ impl geng::State for Game {
             &self.camera,
             &draw_2d::Quad::new(self.bounds, Rgba::new(0.1, 0.1, 0.1, 1.0)),
         );
+
+        ugli::clear(framebuffer, None, Some(1.0), None);
 
         let mut tiles: Vec<_> = self.jigsaw.tiles.iter().enumerate().collect();
         tiles.sort_by_key(|(_, tile)| r32(tile.last_interaction_time));
@@ -447,7 +458,7 @@ impl geng::State for Game {
                             * Mat3::scale_uniform(1.2)
                             * Mat3::translate(delta);
                     }
-                    let depth = 1.0 - 2.0 * depth_i as f32 / tiles.len() as f32;
+                    let depth = 1.0 - 2.0 * (depth_i as f32 + 0.5) / tiles.len() as f32;
                     tile.mesh.iter().map(move |v| {
                         let pos = matrix * v.a_pos.extend(1.0);
                         let a_pos = (pos.xy() / pos.z).extend(depth);
@@ -508,7 +519,7 @@ impl geng::State for Game {
                 ),
                 ugli::DrawParameters {
                     blend_mode: Some(ugli::BlendMode::default()),
-                    depth_func: Some(ugli::DepthFunc::Less),
+                    depth_func: Some(ugli::DepthFunc::LessOrEqual),
                     ..Default::default()
                 },
             );
