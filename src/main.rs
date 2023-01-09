@@ -10,12 +10,14 @@ mod main_menu;
 mod server;
 mod slider;
 mod splitscreen;
+mod text_input;
 mod util;
 
 use assets::Assets;
 use interop::*;
 use interpolation::*;
 use slider::*;
+use text_input::*;
 
 type Connection = geng::net::client::Connection<ServerMessage, ClientMessage>;
 

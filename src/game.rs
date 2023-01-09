@@ -11,6 +11,7 @@ const FOV_MAX: f32 = 20.0;
 #[derive(HasId)]
 struct Player {
     id: Id,
+    name: String,
     interpolation: Interpolated<Vec2<f32>>,
     tile_grabbed: Option<(usize, Vec2<f32>)>,
 }
@@ -31,6 +32,8 @@ struct Game {
     intro_time: f32,
     time: f32,
     hovered_tile: Option<usize>,
+    customize: bool,
+    name_typing: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +74,8 @@ impl Game {
             tile.interpolated.server_update(pos, Vec2::ZERO);
         }
         Self {
+            name_typing: false,
+            customize: false,
             geng: geng.clone(),
             assets: assets.clone(),
             id,
@@ -96,6 +101,7 @@ impl Game {
         if self.players.get(&id).is_none() {
             self.players.insert(Player {
                 id,
+                name: "".to_owned(),
                 interpolation: Interpolated::new(Vec2::ZERO, Vec2::ZERO),
                 tile_grabbed: None,
             });
@@ -293,6 +299,29 @@ impl Game {
 }
 
 impl geng::State for Game {
+    fn ui<'a>(&'a mut self, cx: &'a geng::ui::Controller) -> Box<dyn geng::ui::Widget + 'a> {
+        use geng::ui::*;
+        self.name_typing = false;
+        if self.customize {
+            let save_button = Button::new(cx, "save");
+            let name_input =
+                TextInput::new(cx, &mut self.players.get_mut(&self.id).unwrap().name, 15);
+            self.name_typing = *name_input.capture;
+            if save_button.was_clicked() {
+                self.customize = false;
+            }
+            (name_input.center(), save_button.center())
+                .column()
+                .center()
+                .boxed()
+        } else {
+            let customize_button = Button::new(cx, "customize");
+            if customize_button.was_clicked() {
+                self.customize = true;
+            }
+            (customize_button.align(vec2(0.0, 1.0)),).stack().boxed()
+        }
+    }
     fn update(&mut self, delta_time: f64) {
         let delta_time = delta_time as f32;
         self.time += delta_time;
@@ -333,6 +362,10 @@ impl geng::State for Game {
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
         ugli::clear(framebuffer, Some(Rgba::BLACK), Some(1.0), None);
+
+        if self.customize {
+            return;
+        }
 
         self.geng.draw_2d(
             framebuffer,
@@ -447,6 +480,21 @@ impl geng::State for Game {
         }
     }
     fn handle_event(&mut self, event: geng::Event) {
+        if self.name_typing {
+            // HAHAHAHAHA
+            let player_name = &mut self.players.get_mut(&self.id).unwrap().name;
+            if let geng::Event::KeyDown { key } = event {
+                if key == geng::Key::Backspace {
+                    player_name.pop();
+                }
+                {
+                    let s = format!("{:?}", key);
+                    if s.len() == 1 && player_name.len() < 15 {
+                        player_name.push_str(&s);
+                    }
+                }
+            }
+        }
         match event {
             geng::Event::Wheel { delta } => {
                 const SENSITIVITY: f32 = 0.02;
