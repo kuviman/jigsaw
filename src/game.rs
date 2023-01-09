@@ -76,7 +76,7 @@ impl Game {
             tile.interpolated.server_update(pos, Vec2::ZERO);
         }
         Self {
-            show_names: false,
+            show_names: batbox::preferences::load("show_names").unwrap_or(true),
             name_typing: false,
             customize: false,
             geng: geng.clone(),
@@ -321,6 +321,7 @@ impl geng::State for Game {
             if save_button.was_clicked() {
                 self.customize = false;
                 batbox::preferences::save("name", &self.players.get(&self.id).unwrap().name);
+                batbox::preferences::save("show_names", &self.show_names);
             }
             let name_input =
                 TextInput::new(cx, &mut self.players.get_mut(&self.id).unwrap().name, 15);
