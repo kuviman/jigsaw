@@ -378,7 +378,7 @@ impl Game {
                             });
                             let d0 = (b0 - a0).len();
                             let d = (b - a).len();
-                            self.camera.fov = (initial_camera_fov + d - d0).clamp(FOV_MIN, FOV_MAX);
+                            self.camera.fov = (initial_camera_fov + d0 - d).clamp(FOV_MIN, FOV_MAX);
                         }
                     }
                 }
