@@ -55,7 +55,7 @@ impl Game {
         assets: &Rc<Assets>,
         id: Id,
         room_config: RoomConfig,
-        connection: Connection,
+        mut connection: Connection,
     ) -> Self {
         let image = &assets.images[room_config.image];
         let size = image.size().map(|x| x as f32);
@@ -75,6 +75,14 @@ impl Game {
             );
             tile.interpolated.server_update(pos, Vec2::ZERO);
         }
+        let my_player = Player {
+            id,
+            name: batbox::preferences::load("name").unwrap_or_default(),
+            color: batbox::preferences::load("color").unwrap_or(Rgba::WHITE),
+            interpolation: Interpolated::new(Vec2::ZERO, Vec2::ZERO),
+            tile_grabbed: None,
+        };
+        connection.send(ClientMessage::UpdateName(my_player.name.clone()));
         Self {
             show_names: batbox::preferences::load("show_names").unwrap_or(true),
             name_typing: false,
@@ -85,13 +93,7 @@ impl Game {
             connection,
             players: {
                 let mut players = Collection::new();
-                players.insert(Player {
-                    id,
-                    name: batbox::preferences::load("name").unwrap_or_default(),
-                    color: batbox::preferences::load("color").unwrap_or(Rgba::WHITE),
-                    interpolation: Interpolated::new(Vec2::ZERO, Vec2::ZERO),
-                    tile_grabbed: None,
-                });
+                players.insert(my_player);
                 players
             },
             camera: Camera2d {
@@ -128,6 +130,9 @@ impl Game {
                 ServerMessage::SetupId(..) => unreachable!(),
                 ServerMessage::RoomNotFound => unreachable!(),
                 ServerMessage::RoomCreated(..) => unreachable!(),
+                ServerMessage::UpdatePlayerName(id, name) => {
+                    self.get_player(id).name = name;
+                }
                 ServerMessage::UpdatePos(id, pos) => {
                     self.get_player(id)
                         .interpolation
@@ -322,6 +327,9 @@ impl geng::State for Game {
                 self.customize = false;
                 batbox::preferences::save("name", &self.players.get(&self.id).unwrap().name);
                 batbox::preferences::save("show_names", &self.show_names);
+                self.connection.send(ClientMessage::UpdateName(
+                    self.players.get(&self.id).unwrap().name.clone(),
+                ));
             }
             let name_input =
                 TextInput::new(cx, &mut self.players.get_mut(&self.id).unwrap().name, 15);

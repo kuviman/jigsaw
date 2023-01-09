@@ -10,6 +10,7 @@ pub enum ServerMessage {
     RoomCreated(String),
     PlayerDisconnected(Id),
     UpdatePos(Id, Vec2<f32>),
+    UpdatePlayerName(Id, String),
     TileGrabbed {
         player: Id,
         tile: usize,
@@ -25,6 +26,7 @@ pub enum ServerMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ClientMessage {
+    UpdateName(String),
     CreateRoom(RoomConfig),
     SelectRoom(String),
     UpdatePos(Vec2<f32>),

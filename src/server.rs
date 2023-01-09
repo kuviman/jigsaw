@@ -20,6 +20,7 @@ impl IdGen {
 struct Player {
     id: Id,
     room: String,
+    name: String,
     sender: Box<dyn geng::net::Sender<ServerMessage>>,
 }
 
@@ -84,15 +85,38 @@ impl State {
                     }
                 }
             }
+            ClientMessage::UpdateName(name) => {
+                self.players.get_mut(&id).unwrap().name = name.clone();
+                for player in &mut self.players {
+                    if player.id != id && player.room == room {
+                        player
+                            .sender
+                            .send(ServerMessage::UpdatePlayerName(id, name.clone()));
+                    }
+                }
+            }
             ClientMessage::SelectRoom(room) => {
                 let player = self.players.get_mut(&id).unwrap();
+                let mut messages = Vec::new();
                 if let Some(room) = self.rooms.get(&room) {
                     player.room = room.name.clone();
                     player
                         .sender
                         .send(ServerMessage::SetupId(id, room.config.clone()));
+                    for player in &self.players {
+                        if player.id != id && player.room == room.name {
+                            messages.push(ServerMessage::UpdatePlayerName(
+                                player.id,
+                                player.name.clone(),
+                            ));
+                        }
+                    }
                 } else {
                     player.sender.send(ServerMessage::RoomNotFound);
+                }
+                let player = self.players.get_mut(&id).unwrap(); // KEKW
+                for message in messages {
+                    player.sender.send(message);
                 }
             }
             ClientMessage::GrabTile {
@@ -166,6 +190,7 @@ impl geng::net::server::App for App {
         let id = state.id_gen.gen();
         let player = Player {
             id,
+            name: "".to_owned(),
             room: create_room(),
             sender,
         };
