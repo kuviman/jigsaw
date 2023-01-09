@@ -360,7 +360,8 @@ impl geng::State for Game {
             }
             let mesh: Vec<Vertex> = tiles
                 .iter()
-                .flat_map(|(i, tile)| {
+                .enumerate()
+                .flat_map(|(depth_i, (i, tile))| {
                     let mut matrix = tile.matrix();
                     if let Some(connected_to) = grabbed_tiles.get(i) {
                         let delta = (tile.puzzle_pos.map(|x| x as f32)
@@ -370,7 +371,7 @@ impl geng::State for Game {
                             * Mat3::scale_uniform(1.2)
                             * Mat3::translate(delta);
                     }
-                    let depth = 1.0 - 2.0 * *i as f32 / (tiles.len() as f32 - 1.0);
+                    let depth = 1.0 - 2.0 * depth_i as f32 / (tiles.len() as f32 - 1.0);
                     tile.mesh.iter().map(move |v| {
                         let pos = matrix * v.a_pos.extend(1.0);
                         let a_pos = (pos.xy() / pos.z).extend(depth);
@@ -398,7 +399,7 @@ impl geng::State for Game {
             );
         }
 
-        for (i, tile) in &tiles {
+        for (depth_i, (i, tile)) in tiles.iter().enumerate() {
             let mut matrix = tile.matrix();
             if let Some(connected_to) = grabbed_tiles.get(i) {
                 let delta = (tile.puzzle_pos.map(|x| x as f32)
@@ -411,7 +412,7 @@ impl geng::State for Game {
             } else {
                 Rgba::BLACK
             };
-            let depth = 1.0 - 2.0 * *i as f32 / (tiles.len() as f32 - 1.0);
+            let depth = 1.0 - 2.0 * depth_i as f32 / (tiles.len() as f32 - 1.0);
             ugli::draw(
                 framebuffer,
                 &self.assets.shaders.outline,
