@@ -466,7 +466,7 @@ impl geng::State for Game {
                             - connected_to.puzzle_pos.map(|x| x as f32))
                             * self.jigsaw.tile_size;
                         matrix = connected_to.matrix()
-                            * Mat3::scale_uniform(1.2)
+                            * Mat3::scale_uniform(1.05)
                             * Mat3::translate(delta);
                     }
                     let depth = 1.0 - 2.0 * (depth_i as f32 + 0.5) / tiles.len() as f32;
@@ -512,7 +512,7 @@ impl geng::State for Game {
                 let delta = (tile.puzzle_pos.map(|x| x as f32)
                     - connected_to.puzzle_pos.map(|x| x as f32))
                     * self.jigsaw.tile_size;
-                matrix = connected_to.matrix() * Mat3::scale_uniform(1.2) * Mat3::translate(delta);
+                matrix = connected_to.matrix() * Mat3::scale_uniform(1.05) * Mat3::translate(delta);
             }
             let outline_color = if hovered.contains(&i) {
                 Rgba::WHITE
