@@ -59,6 +59,7 @@ impl Game {
         geng: &Geng,
         assets: &Rc<Assets>,
         id: Id,
+        name: Option<String>,
         room_config: RoomConfig,
         tiles: Vec<TileState>,
         mut connection: Connection,
@@ -80,7 +81,7 @@ impl Game {
         }
         let my_player = Player {
             id,
-            name: batbox::preferences::load("name").unwrap_or_default(),
+            name: name.unwrap_or_else(|| batbox::preferences::load("name").unwrap_or_default()),
             color: batbox::preferences::load("color").unwrap_or(Rgba::WHITE),
             interpolation: Interpolated::new(Vec2::ZERO, Vec2::ZERO),
             tile_grabbed: None,
@@ -581,7 +582,7 @@ impl geng::State for Game {
                     * self.jigsaw.tile_size;
                 matrix = connected_to.matrix() * Mat3::scale_uniform(1.05) * Mat3::translate(delta);
             }
-            let mut outline_color = if hovered.contains(&i) {
+            let mut outline_color = if hovered.contains(i) {
                 Rgba::WHITE
             } else {
                 Rgba::BLACK
@@ -704,7 +705,7 @@ impl geng::State for Game {
     }
 }
 
-pub fn run(geng: &Geng, addr: &str, room: &str) -> impl geng::State {
+pub fn run(geng: &Geng, addr: &str, room: &str, name: Option<String>) -> impl geng::State {
     let future = {
         let geng = geng.clone();
         let room = room.to_owned();
@@ -720,7 +721,15 @@ pub fn run(geng: &Geng, addr: &str, room: &str) -> impl geng::State {
                     player_id,
                     room_config,
                     tiles,
-                }) => game::Game::new(&geng, &assets, player_id, room_config, tiles, connection),
+                }) => game::Game::new(
+                    &geng,
+                    &assets,
+                    player_id,
+                    name,
+                    room_config,
+                    tiles,
+                    connection,
+                ),
                 Some(ServerMessage::RoomNotFound) => panic!("Room not found"),
                 _ => unreachable!(),
             }

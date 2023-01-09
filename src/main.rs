@@ -33,6 +33,8 @@ struct Opt {
     pub splits: Option<usize>,
     #[clap(long)]
     pub room_config: Option<std::path::PathBuf>,
+    #[clap(long)]
+    pub name: Option<String>,
 }
 
 fn main() {
@@ -96,15 +98,24 @@ fn main() {
                     splitscreen::SplitScreen::new(
                         &geng,
                         (0..splits).map(|_| {
-                            Box::new(game::run(&geng, opt.connect.as_deref().unwrap(), room))
-                                as Box<dyn geng::State>
+                            Box::new(game::run(
+                                &geng,
+                                opt.connect.as_deref().unwrap(),
+                                room,
+                                None,
+                            )) as Box<dyn geng::State>
                         }),
                     ),
                 );
             } else {
                 geng::run(
                     &geng,
-                    game::run(&geng, opt.connect.as_deref().unwrap(), room),
+                    game::run(
+                        &geng,
+                        opt.connect.as_deref().unwrap(),
+                        room,
+                        opt.name.clone(),
+                    ),
                 );
             }
         } else {

@@ -65,7 +65,7 @@ impl geng::State for ConfigScreen {
                         .location()
                         .set_href(&format!("?room={}", room))
                         .unwrap();
-                    game::run(&geng, &addr, &room)
+                    game::run(&geng, &addr, &room, None)
                 }
             };
             let state =
