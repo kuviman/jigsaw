@@ -6,6 +6,14 @@ pub struct Assets {
     pub sounds: Sounds,
     #[asset(range = "1..=3", path = "images/*.png")]
     pub images: Vec<ugli::Texture>,
+    pub hand: HandAssets,
+}
+
+#[derive(geng::Assets)]
+pub struct HandAssets {
+    pub grab: ugli::Texture,
+    pub regular: ugli::Texture,
+    pub thumb: ugli::Texture,
 }
 
 #[derive(geng::Assets)]

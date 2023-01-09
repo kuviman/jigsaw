@@ -12,6 +12,7 @@ const FOV_MAX: f32 = 20.0;
 struct Player {
     id: Id,
     name: String,
+    color: Rgba<f32>,
     interpolation: Interpolated<Vec2<f32>>,
     tile_grabbed: Option<(usize, Vec2<f32>)>,
 }
@@ -80,7 +81,17 @@ impl Game {
             assets: assets.clone(),
             id,
             connection,
-            players: Collection::new(),
+            players: {
+                let mut players = Collection::new();
+                players.insert(Player {
+                    id,
+                    name: batbox::preferences::load("name").unwrap_or_default(),
+                    color: batbox::preferences::load("color").unwrap_or(Rgba::WHITE),
+                    interpolation: Interpolated::new(Vec2::ZERO, Vec2::ZERO),
+                    tile_grabbed: None,
+                });
+                players
+            },
             camera: Camera2d {
                 center: Vec2::ZERO,
                 rotation: 0.0,
@@ -102,6 +113,7 @@ impl Game {
             self.players.insert(Player {
                 id,
                 name: "".to_owned(),
+                color: Rgba::WHITE,
                 interpolation: Interpolated::new(Vec2::ZERO, Vec2::ZERO),
                 tile_grabbed: None,
             });
@@ -304,12 +316,13 @@ impl geng::State for Game {
         self.name_typing = false;
         if self.customize {
             let save_button = Button::new(cx, "save");
+            if save_button.was_clicked() {
+                self.customize = false;
+                batbox::preferences::save("name", &self.players.get(&self.id).unwrap().name);
+            }
             let name_input =
                 TextInput::new(cx, &mut self.players.get_mut(&self.id).unwrap().name, 15);
             self.name_typing = *name_input.capture;
-            if save_button.was_clicked() {
-                self.customize = false;
-            }
             (name_input.center(), save_button.center())
                 .column()
                 .center()
@@ -364,7 +377,12 @@ impl geng::State for Game {
         ugli::clear(framebuffer, Some(Rgba::BLACK), Some(1.0), None);
 
         if self.customize {
+            self.geng
+                .window()
+                .set_cursor_type(geng::CursorType::Default);
             return;
+        } else {
+            self.geng.window().set_cursor_type(geng::CursorType::None);
         }
 
         self.geng.draw_2d(
@@ -468,14 +486,24 @@ impl geng::State for Game {
         }
 
         for player in &self.players {
+            let size = self.camera.fov * 0.01;
             self.geng.draw_2d(
                 framebuffer,
                 &self.camera,
-                &draw_2d::Ellipse::circle(
-                    player.interpolation.get(),
-                    self.camera.fov * 0.01,
-                    Rgba::WHITE,
-                ),
+                &draw_2d::TexturedQuad::unit(&self.assets.hand.regular) // TODO grab
+                    .scale_uniform(size)
+                    .translate(player.interpolation.get()),
+            );
+            self.geng.default_font().draw_with_outline(
+                framebuffer,
+                &self.camera,
+                &player.name,
+                player.interpolation.get() + vec2(0.0, -size * 3.0),
+                geng::TextAlign::CENTER,
+                size * 2.0,
+                player.color,
+                size * 0.1,
+                Rgba::BLACK,
             );
         }
     }
