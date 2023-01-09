@@ -501,6 +501,11 @@ impl geng::State for Game {
             );
         }
 
+        let hovered = self
+            .hovered_tile
+            .map(|tile| self.jigsaw.get_all_connected(tile))
+            .unwrap_or_default();
+
         for (depth_i, (i, tile)) in tiles.iter().enumerate() {
             let mut matrix = tile.matrix();
             if let Some(connected_to) = grabbed_tiles.get(i) {
@@ -509,7 +514,7 @@ impl geng::State for Game {
                     * self.jigsaw.tile_size;
                 matrix = connected_to.matrix() * Mat3::scale_uniform(1.2) * Mat3::translate(delta);
             }
-            let outline_color = if Some(*i) == self.hovered_tile {
+            let outline_color = if hovered.contains(&i) {
                 Rgba::WHITE
             } else {
                 Rgba::BLACK
