@@ -37,6 +37,9 @@ struct Game {
     name_typing: bool,
     show_names: bool,
     finish_time: Option<f32>,
+    cursor_pos: Vec2<f64>,
+    cursor_world: Vec2<f32>,
+    touch: Option<Vec<geng::TouchPoint>>,
 }
 
 #[derive(Debug, Clone)]
@@ -48,6 +51,7 @@ struct Dragging {
 #[derive(Debug, Clone)]
 enum DragTarget {
     Camera { initial_camera_pos: Vec2<f32> },
+    CameraZoom { initial_camera_fov: f32 },
 }
 
 impl Game {
@@ -110,6 +114,9 @@ impl Game {
             // intro_time: 1.0,
             time: 0.0,
             finish_time: None,
+            cursor_pos: Vec2::ZERO,
+            cursor_world: Vec2::ZERO,
+            touch: None,
         }
     }
     fn get_player(&mut self, id: Id) -> &mut Player {
@@ -195,6 +202,7 @@ impl Game {
             .map(|(i, _)| i)
     }
     fn click(&mut self, screen_pos: Vec2<f64>) {
+        self.update_cursor(screen_pos);
         let pos = self.camera.screen_to_world(
             self.framebuffer_size.map(|x| x as f32),
             screen_pos.map(|x| x as f32),
@@ -302,6 +310,7 @@ impl Game {
         self.dragging = Some(drag);
     }
     fn update_cursor(&mut self, screen_pos: Vec2<f64>) {
+        self.cursor_pos = screen_pos;
         let cursor_pos = self
             .camera
             .screen_to_world(
@@ -309,6 +318,7 @@ impl Game {
                 screen_pos.map(|x| x as f32),
             )
             .clamp_aabb(self.bounds);
+        self.cursor_world = cursor_pos;
         self.connection.send(ClientMessage::UpdatePos(cursor_pos));
         let me = self.get_player(self.id);
         me.interpolation.teleport(cursor_pos, Vec2::ZERO);
@@ -324,6 +334,7 @@ impl Game {
                     let target = initial_camera_pos + from - cursor_pos;
                     self.camera.center = target.clamp_aabb(self.bounds);
                 }
+                DragTarget::CameraZoom { .. } => {}
             }
         } else if let Some(hovered) = self.hovered_tile(cursor_pos) {
             if Some(hovered) != self.hovered_tile {
@@ -336,6 +347,44 @@ impl Game {
     }
     fn stop_drag(&mut self) {
         if let Some(_dragging) = self.dragging.take() {}
+    }
+    fn touch(&mut self, touches: Vec<geng::TouchPoint>) {
+        match &touches[..] {
+            [p] => self.click(p.position),
+            [a, _] => {
+                self.start_drag(Dragging {
+                    initial_screen_pos: a.position,
+                    target: DragTarget::CameraZoom {
+                        initial_camera_fov: self.camera.fov,
+                    },
+                });
+                self.touch = Some(touches);
+            }
+            _ => {}
+        }
+    }
+    fn update_touches(&mut self, touches: Vec<geng::TouchPoint>) {
+        match &touches[..] {
+            [p] => self.update_cursor(p.position),
+            [a, b] => {
+                if let Some([a0, b0]) = self.touch.as_deref() {
+                    if let Some(drag) = &self.dragging {
+                        if let DragTarget::CameraZoom { initial_camera_fov } = drag.target {
+                            let [a0, b0, a, b] = [a0, b0, a, b].map(|p| {
+                                self.camera.screen_to_world(
+                                    self.framebuffer_size.map(|x| x as f32),
+                                    p.position.map(|x| x as f32),
+                                )
+                            });
+                            let d0 = (b0 - a0).len();
+                            let d = (b - a).len();
+                            self.camera.fov = (initial_camera_fov + d - d0).clamp(FOV_MIN, FOV_MAX);
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
@@ -643,6 +692,11 @@ impl geng::State for Game {
                 geng::MouseButton::Middle => {}
             },
             geng::Event::MouseUp { .. } => {
+                self.release();
+            }
+            geng::Event::TouchStart { touches } => self.touch(touches),
+            geng::Event::TouchMove { touches } => self.update_touches(touches),
+            geng::Event::TouchEnd { .. } => {
                 self.release();
             }
             _ => (),
