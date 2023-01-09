@@ -36,6 +36,7 @@ struct Game {
     customize: bool,
     name_typing: bool,
     show_names: bool,
+    finished: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +108,7 @@ impl Game {
             room_config,
             intro_time: 1.0,
             time: 0.0,
+            finished: false,
         }
     }
     fn get_player(&mut self, id: Id) -> &mut Player {
@@ -381,6 +383,10 @@ impl geng::State for Game {
         let delta_time = delta_time as f32;
         self.time += delta_time;
 
+        if !self.finished && self.jigsaw.get_all_connected(0).len() == self.jigsaw.tiles.len() {
+            self.finished = true;
+        }
+
         self.handle_connection();
 
         if std::mem::take(&mut self.play_connect_sound) {
@@ -553,6 +559,8 @@ impl geng::State for Game {
                 || player.id == self.id && self.dragging.is_some()
             {
                 &self.assets.hand.grab
+            } else if self.finished {
+                &self.assets.hand.thumb
             } else {
                 &self.assets.hand.regular
             };
