@@ -26,4 +26,10 @@ pub struct Shaders {
 pub struct Sounds {
     pub connect_piece: geng::Sound,
     pub grab: geng::Sound,
+    #[asset(path = "music.mp3", postprocess = "make_looped")]
+    pub music: geng::Sound,
+}
+
+fn make_looped(sound: &mut geng::Sound) {
+    sound.looped = true;
 }

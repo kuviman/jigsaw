@@ -58,6 +58,7 @@ impl Game {
         tiles: Vec<TileState>,
         mut connection: Connection,
     ) -> Self {
+        assets.sounds.music.play();
         let image = &assets.images[room_config.image];
         let size = image.size().map(|x| x as f32);
         let size = size * 5.0 / size.y;
