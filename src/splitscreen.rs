@@ -4,6 +4,7 @@ pub struct SplitScreen {
     geng: Geng,
     inner: Vec<geng::StateManager>,
     texture: ugli::Texture,
+    renderbuffer: ugli::Renderbuffer<ugli::DepthComponent>,
 }
 
 impl SplitScreen {
@@ -19,6 +20,7 @@ impl SplitScreen {
                 })
                 .collect(),
             texture: ugli::Texture::new_with(geng.ugli(), vec2(1, 1), |_| Rgba::WHITE),
+            renderbuffer: ugli::Renderbuffer::new(geng.ugli(), vec2(1, 1)),
         }
     }
 }
@@ -31,13 +33,15 @@ impl geng::State for SplitScreen {
         );
         if texture_size != self.texture.size() {
             self.texture = ugli::Texture::new_uninitialized(self.geng.ugli(), texture_size);
+            self.renderbuffer = ugli::Renderbuffer::new(self.geng.ugli(), texture_size);
         }
         let mut x = 0;
         for inner in &mut self.inner {
             {
-                let mut framebuffer = ugli::Framebuffer::new_color(
+                let mut framebuffer = ugli::Framebuffer::new(
                     self.geng.ugli(),
                     ugli::ColorAttachment::Texture(&mut self.texture),
+                    ugli::DepthAttachment::Renderbuffer(&mut self.renderbuffer),
                 );
                 inner.draw(&mut framebuffer);
             }

@@ -472,7 +472,11 @@ impl geng::State for Game {
                     },
                     geng::camera2d_uniforms(&self.camera, framebuffer.size().map(|x| x as f32)),
                 ),
-                ugli::DrawParameters::default(),
+                ugli::DrawParameters {
+                    // blend_mode: Some(ugli::BlendMode::default()),
+                    depth_func: Some(ugli::DepthFunc::Less),
+                    ..Default::default()
+                },
             );
         }
 
