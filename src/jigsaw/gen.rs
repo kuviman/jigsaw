@@ -33,16 +33,34 @@ fn finalize_meshes(
 type Polygon = Vec<Vec2<f32>>;
 
 fn jigsaw(seed: u64, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
+    let mut rng = rand::prelude::StdRng::seed_from_u64(seed);
     let tile_size = size / pieces.map(|x| x as f32);
+    let mut vertices: Vec<Vec2<f32>> = (0..=pieces.y)
+        .flat_map(|y| (0..=pieces.x).map(move |x| vec2(x as f32, y as f32) * tile_size))
+        .collect();
+    // Apply noise
+    let dx = tile_size.x * 0.05;
+    let dy = tile_size.y * 0.05;
+    for (i, v) in vertices.iter_mut().enumerate() {
+        if i < pieces.x + 1
+            || i >= pieces.y * (pieces.x + 1)
+            || i % (pieces.x + 1) == 0
+            || i % (pieces.x + 1) == pieces.x
+        {
+            continue;
+        }
+        *v += vec2(rng.gen_range(-dx..=dx), rng.gen_range(-dy..=dy));
+    }
     let mut jigsaw: Vec<[Vec<Vec2<f32>>; 4]> = (0..pieces.y)
         .flat_map(|y| {
+            let vertices = &vertices;
             (0..pieces.x).map(move |x| {
-                let pos = vec2(x as f32, y as f32) * tile_size;
+                let i = x + y * (pieces.x + 1);
                 [
-                    vec![pos],
-                    vec![pos + vec2(tile_size.x, 0.0)],
-                    vec![pos + tile_size],
-                    vec![pos + vec2(0.0, tile_size.y)],
+                    vec![vertices[i]],
+                    vec![vertices[i + 1]],
+                    vec![vertices[i + 1 + pieces.x + 1]],
+                    vec![vertices[i + pieces.x + 1]],
                 ]
             })
         })
@@ -50,7 +68,6 @@ fn jigsaw(seed: u64, size: Vec2<f32>, pieces: Vec2<usize>) -> Vec<Polygon> {
 
     let vertical_edges = pieces.y * (pieces.x - 1);
     let edges_count = vertical_edges + pieces.x * (pieces.y - 1);
-    let mut rng = rand::prelude::StdRng::seed_from_u64(seed);
     let knob: Vec<Vec2<f32>> = {
         const KNOB_RESOLUTION: usize = 10;
         const MIN: f32 = 3.95;
