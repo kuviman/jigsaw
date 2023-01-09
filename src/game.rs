@@ -36,7 +36,7 @@ struct Game {
     customize: bool,
     name_typing: bool,
     show_names: bool,
-    finished: bool,
+    finish_time: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,7 +109,7 @@ impl Game {
             room_config,
             // intro_time: 1.0,
             time: 0.0,
-            finished: false,
+            finish_time: None,
         }
     }
     fn get_player(&mut self, id: Id) -> &mut Player {
@@ -199,7 +199,10 @@ impl Game {
             self.framebuffer_size.map(|x| x as f32),
             screen_pos.map(|x| x as f32),
         );
-        if let Some(i) = self.hovered_tile(pos) {
+        if let Some(i) = self
+            .hovered_tile(pos)
+            .filter(|_| self.finish_time.is_none())
+        {
             let tile = self.jigsaw.tiles.get_mut(i).unwrap();
             let player = self.players.get_mut(&self.id).unwrap();
             let offset = tile.interpolated.get() - pos;
@@ -384,8 +387,10 @@ impl geng::State for Game {
         let delta_time = delta_time as f32;
         self.time += delta_time;
 
-        if !self.finished && self.jigsaw.get_all_connected(0).len() == self.jigsaw.tiles.len() {
-            self.finished = true;
+        if self.finish_time.is_none()
+            && self.jigsaw.get_all_connected(0).len() == self.jigsaw.tiles.len()
+        {
+            self.finish_time = Some(self.time);
         }
 
         self.handle_connection();
@@ -527,11 +532,14 @@ impl geng::State for Game {
                     * self.jigsaw.tile_size;
                 matrix = connected_to.matrix() * Mat3::scale_uniform(1.05) * Mat3::translate(delta);
             }
-            let outline_color = if hovered.contains(&i) {
+            let mut outline_color = if hovered.contains(&i) {
                 Rgba::WHITE
             } else {
                 Rgba::BLACK
             };
+            outline_color.a = self
+                .finish_time
+                .map_or(1.0, |finish| 1.0 - (self.time - finish));
             let depth = (1.0 - 2.0 * (depth_i as f32 + 0.5) / tiles.len() as f32).clamp_abs(1.0);
             ugli::draw(
                 framebuffer,
@@ -560,7 +568,7 @@ impl geng::State for Game {
                 || player.id == self.id && self.dragging.is_some()
             {
                 &self.assets.hand.grab
-            } else if self.finished {
+            } else if self.finish_time.is_some() {
                 &self.assets.hand.thumb
             } else {
                 &self.assets.hand.regular
