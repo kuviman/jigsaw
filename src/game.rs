@@ -407,7 +407,17 @@ impl geng::State for Game {
                 .set_cursor_type(geng::CursorType::Default);
             return;
         } else {
-            self.geng.window().set_cursor_type(geng::CursorType::None);
+            let cursor_pos = self.camera.screen_to_world(
+                self.framebuffer_size.map(|x| x as f32),
+                self.geng.window().mouse_pos().map(|x| x as f32),
+            );
+            if cursor_pos != self.players.get(&self.id).unwrap().interpolation.get() {
+                self.geng
+                    .window()
+                    .set_cursor_type(geng::CursorType::Default);
+            } else {
+                self.geng.window().set_cursor_type(geng::CursorType::None);
+            }
         }
 
         self.geng.draw_2d(
@@ -516,10 +526,15 @@ impl geng::State for Game {
 
         for player in &self.players {
             let size = self.camera.fov * 0.01;
+            let texture = if player.tile_grabbed.is_some() {
+                &self.assets.hand.grab
+            } else {
+                &self.assets.hand.regular
+            };
             self.geng.draw_2d(
                 framebuffer,
                 &self.camera,
-                &draw_2d::TexturedQuad::unit(&self.assets.hand.regular) // TODO grab
+                &draw_2d::TexturedQuad::unit(texture)
                     .scale_uniform(size)
                     .translate(player.interpolation.get()),
             );
