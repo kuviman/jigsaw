@@ -35,6 +35,7 @@ struct Game {
     hovered_tile: Option<usize>,
     customize: bool,
     name_typing: bool,
+    show_names: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +76,7 @@ impl Game {
             tile.interpolated.server_update(pos, Vec2::ZERO);
         }
         Self {
+            show_names: false,
             name_typing: false,
             customize: false,
             geng: geng.clone(),
@@ -323,7 +325,22 @@ impl geng::State for Game {
             let name_input =
                 TextInput::new(cx, &mut self.players.get_mut(&self.id).unwrap().name, 15);
             self.name_typing = *name_input.capture;
-            (name_input.center(), save_button.center())
+            let show_names = Button::new(
+                cx,
+                if self.show_names {
+                    "Show names: YES"
+                } else {
+                    "Show names: NO"
+                },
+            );
+            if show_names.was_clicked() {
+                self.show_names = !self.show_names;
+            }
+            (
+                name_input.center(),
+                show_names.center(),
+                save_button.center(),
+            )
                 .column()
                 .center()
                 .boxed()
@@ -494,17 +511,19 @@ impl geng::State for Game {
                     .scale_uniform(size)
                     .translate(player.interpolation.get()),
             );
-            self.geng.default_font().draw_with_outline(
-                framebuffer,
-                &self.camera,
-                &player.name,
-                player.interpolation.get() + vec2(0.0, -size * 3.0),
-                geng::TextAlign::CENTER,
-                size * 2.0,
-                player.color,
-                size * 0.1,
-                Rgba::BLACK,
-            );
+            if self.show_names {
+                self.geng.default_font().draw_with_outline(
+                    framebuffer,
+                    &self.camera,
+                    &player.name,
+                    player.interpolation.get() + vec2(0.0, -size * 3.0),
+                    geng::TextAlign::CENTER,
+                    size * 2.0,
+                    player.color,
+                    size * 0.1,
+                    Rgba::BLACK,
+                );
+            }
         }
     }
     fn handle_event(&mut self, event: geng::Event) {
