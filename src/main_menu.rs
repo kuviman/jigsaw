@@ -1,6 +1,7 @@
 use super::*;
 
 struct ConfigScreen {
+    assets: Rc<Assets>,
     geng: Geng,
     config: RoomConfig,
     addr: String,
@@ -8,8 +9,9 @@ struct ConfigScreen {
 }
 
 impl ConfigScreen {
-    fn new(geng: &Geng, addr: &str) -> Self {
+    fn new(geng: &Geng, assets: Rc<Assets>, addr: &str) -> Self {
         Self {
+            assets,
             addr: addr.to_owned(),
             geng: geng.clone(),
             config: RoomConfig {
@@ -33,13 +35,10 @@ impl geng::State for ConfigScreen {
             let future = {
                 let geng = self.geng.clone();
                 let addr = self.addr.clone();
+                let config = self.config.clone();
                 async move {
                     let mut con: Connection = geng::net::client::connect(&addr).await;
-                    con.send(ClientMessage::CreateRoom(RoomConfig {
-                        seed: thread_rng().gen(),
-                        size: vec2(6, 8),
-                        image: 0,
-                    }));
+                    con.send(ClientMessage::CreateRoom(config));
                     let room = match con.next().await {
                         Some(ServerMessage::RoomCreated(name)) => name,
                         _ => unreachable!(),
@@ -53,7 +52,11 @@ impl geng::State for ConfigScreen {
                 });
             self.transition = Some(geng::Transition::Switch(Box::new(state)));
         }
-        (play_button,).column().center().boxed()
+        let image_button = Button::new(cx, &format!("Harvest #{}", self.config.image + 1));
+        if image_button.was_clicked() {
+            self.config.image = (self.config.image + 1) % self.assets.images.len();
+        }
+        (image_button, play_button).column().center().boxed()
     }
     fn transition(&mut self) -> Option<geng::Transition> {
         self.transition.take()
@@ -64,7 +67,15 @@ pub fn run(geng: &Geng, addr: &str) -> impl geng::State {
     let future = {
         let geng = geng.clone();
         let addr = addr.to_owned();
-        async move { ConfigScreen::new(&geng, &addr) }
+        async move {
+            ConfigScreen::new(
+                &geng,
+                geng::LoadAsset::load(&geng, &run_dir().join("assets"))
+                    .await
+                    .unwrap(),
+                &addr,
+            )
+        }
     };
     geng::LoadingScreen::new(geng, geng::EmptyLoadingScreen, future, |state| state)
 }

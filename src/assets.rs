@@ -4,7 +4,7 @@ use super::*;
 pub struct Assets {
     pub shaders: Shaders,
     pub sounds: Sounds,
-    #[asset(range = "1..=1", path = "images/*.png")]
+    #[asset(range = "1..=3", path = "images/*.png")]
     pub images: Vec<ugli::Texture>,
 }
 
