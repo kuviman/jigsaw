@@ -5,14 +5,19 @@ mod game;
 mod interop;
 mod interpolation;
 mod jigsaw;
+mod main_menu;
 #[cfg(not(target_arch = "wasm32"))]
 mod server;
+mod slider;
 mod splitscreen;
 mod util;
 
 use assets::Assets;
 use interop::*;
 use interpolation::*;
+use slider::*;
+
+type Connection = geng::net::client::Connection<ServerMessage, ClientMessage>;
 
 #[derive(clap::Parser)]
 struct Opt {
@@ -64,13 +69,14 @@ fn main() {
 
         let geng = Geng::new_with(geng::ContextOptions {
             title: "LD 52".to_owned(),
+            target_ui_resolution: Some(vec2(800.0, 600.0)),
             ..default()
         });
         if let Some(config) = &opt.room_config {
             let config: RoomConfig =
                 serde_json::from_reader(std::fs::File::open(config).unwrap()).unwrap();
             futures::executor::block_on(async {
-                let mut con: geng::net::client::Connection<ServerMessage, ClientMessage> =
+                let mut con: Connection =
                     geng::net::client::connect(opt.connect.as_deref().unwrap()).await;
                 con.send(ClientMessage::CreateRoom(config));
                 match con.next().await {
@@ -93,7 +99,10 @@ fn main() {
                 ),
             );
         } else {
-            todo!("Room creation menu")
+            geng::run(
+                &geng,
+                main_menu::run(&geng, opt.connect.as_deref().unwrap()),
+            );
         }
 
         #[cfg(not(target_arch = "wasm32"))]

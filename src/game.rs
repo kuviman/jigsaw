@@ -8,8 +8,6 @@ const SNAP_DISTANCE: f32 = 0.2;
 const FOV_MIN: f32 = 2.0;
 const FOV_MAX: f32 = 20.0;
 
-type Connection = geng::net::client::Connection<ServerMessage, ClientMessage>;
-
 #[derive(HasId)]
 struct Player {
     id: Id,
