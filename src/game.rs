@@ -348,7 +348,13 @@ impl Game {
     fn touch(&mut self, touches: Vec<geng::TouchPoint>) {
         match &touches[..] {
             [p] => self.click(p.position),
-            [_, _] => {
+            [a, b] => {
+                self.start_drag(Dragging {
+                    initial_screen_pos: (a.position + b.position) / 2.0,
+                    target: DragTarget::Camera {
+                        initial_camera_pos: self.camera.center,
+                    },
+                });
                 self.touch = Some(touches);
             }
             _ => {}
@@ -359,9 +365,27 @@ impl Game {
             [p] => self.update_cursor(p.position),
             [a, b] => {
                 if let Some([a0, b0]) = self.touch.as_deref() {
+                    // Zoom
                     let d0 = (b0.position - a0.position).len() as f32;
                     let d = (b.position - a.position).len() as f32;
-                    self.camera.fov /= d / d0;
+                    self.camera.fov = (self.camera.fov / (d / d0)).clamp(FOV_MIN, FOV_MAX);
+
+                    // Move
+                    if let Some(drag) = &self.dragging {
+                        let DragTarget::Camera { initial_camera_pos } = drag.target;
+                        {
+                            let p0 = drag.initial_screen_pos.map(|x| x as f32);
+                            let p1 = (a.position + b.position).map(|x| x as f32) / 2.0;
+                            let from = self
+                                .camera
+                                .screen_to_world(self.framebuffer_size.map(|x| x as f32), p0);
+                            let to = self
+                                .camera
+                                .screen_to_world(self.framebuffer_size.map(|x| x as f32), p1);
+                            let target = initial_camera_pos + from - to;
+                            self.camera.center = target.clamp_aabb(self.bounds);
+                        }
+                    }
                 }
                 self.touch = Some(touches);
             }
