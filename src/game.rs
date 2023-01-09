@@ -176,7 +176,7 @@ impl Game {
                     } else {
                         unreachable!()
                     };
-                    self.move_tile(a, pos, None, false);
+                    self.move_tile(a, pos, None, true);
                     self.play_connect_sound = true;
                 }
             }
@@ -223,17 +223,12 @@ impl Game {
         if let Some((tile_id, _)) = player.tile_grabbed.take() {
             self.assets.sounds.grab.play();
             let connected = self.jigsaw.get_all_connected(tile_id);
-            self.connection.send(ClientMessage::ReleaseTile(
-                connected
-                    .iter()
-                    .map(|&tile| (tile, self.jigsaw.tiles[tile].interpolated.get()))
-                    .collect(),
-            ));
             let tile = self.jigsaw.tiles.get_mut(tile_id).unwrap();
             tile.grabbed_by = None;
 
             // Try to connect
-            for tile_id in connected {
+            let mut moves = Vec::new();
+            for &tile_id in &connected {
                 let tile = self.jigsaw.tiles.get(tile_id).unwrap();
                 let pos = tile.interpolated.get();
                 let puzzle_pos = tile.puzzle_pos;
@@ -262,10 +257,21 @@ impl Game {
                         if delta.len() <= SNAP_DISTANCE {
                             self.connection
                                 .send(ClientMessage::ConnectTiles(tile_id, i));
+                            let pos = pos - delta;
+                            moves.push((tile_id, pos));
                         }
                     }
                 }
             }
+            for (tile, pos) in moves {
+                self.move_tile(tile, pos, None, true);
+            }
+            self.connection.send(ClientMessage::ReleaseTile(
+                connected
+                    .into_iter()
+                    .map(|tile| (tile, self.jigsaw.tiles[tile].interpolated.get()))
+                    .collect(),
+            ));
         }
     }
     fn move_tile(&mut self, tile: usize, pos: Vec2<f32>, vel: Option<Vec2<f32>>, snap: bool) {
