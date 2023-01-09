@@ -311,17 +311,15 @@ impl Game {
     }
     fn update_cursor(&mut self, screen_pos: Vec2<f64>) {
         self.cursor_pos = screen_pos;
-        let cursor_pos = self
-            .camera
-            .screen_to_world(
-                self.framebuffer_size.map(|x| x as f32),
-                screen_pos.map(|x| x as f32),
-            )
-            .clamp_aabb(self.bounds);
+        let cursor_pos = self.camera.screen_to_world(
+            self.framebuffer_size.map(|x| x as f32),
+            screen_pos.map(|x| x as f32),
+        );
         self.cursor_world = cursor_pos;
-        self.connection.send(ClientMessage::UpdatePos(cursor_pos));
+        let clamped_pos = cursor_pos.clamp_aabb(self.bounds);
+        self.connection.send(ClientMessage::UpdatePos(clamped_pos));
         let me = self.get_player(self.id);
-        me.interpolation.teleport(cursor_pos, Vec2::ZERO);
+        me.interpolation.teleport(clamped_pos, Vec2::ZERO);
 
         if let Some(dragging) = &mut self.dragging {
             self.hovered_tile = None;
@@ -335,7 +333,7 @@ impl Game {
                     self.camera.center = target.clamp_aabb(self.bounds);
                 }
             }
-        } else if let Some(hovered) = self.hovered_tile(cursor_pos) {
+        } else if let Some(hovered) = self.hovered_tile(clamped_pos) {
             if Some(hovered) != self.hovered_tile {
                 self.hovered_tile = Some(hovered);
                 // self.assets.sounds.hover.play();
