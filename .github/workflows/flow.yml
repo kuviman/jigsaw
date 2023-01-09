@@ -12,6 +12,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
       - run: cargo geng build --release --target wasm32-unknown-unknown
+      - run: cp -r assets target/geng/ # because of old cargo-geng
       - name: Upload artifacts (web)
         uses: actions/upload-artifact@v2
         with:
