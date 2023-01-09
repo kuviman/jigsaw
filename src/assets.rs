@@ -4,6 +4,7 @@ use super::*;
 pub struct Assets {
     pub shaders: Shaders,
     pub sounds: Sounds,
+    pub sprites: Sprites,
     #[asset(range = "1..=3", path = "images/*.png")]
     pub images: Vec<ugli::Texture>,
     pub hand: HandAssets,
@@ -28,6 +29,11 @@ pub struct Sounds {
     pub grab: geng::Sound,
     #[asset(path = "music.mp3", postprocess = "make_looped")]
     pub music: geng::Sound,
+}
+
+#[derive(geng::Assets)]
+pub struct Sprites {
+    pub table: ugli::Texture,
 }
 
 fn make_looped(sound: &mut geng::Sound) {

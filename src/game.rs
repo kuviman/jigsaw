@@ -478,7 +478,12 @@ impl geng::State for Game {
     }
     fn draw(&mut self, framebuffer: &mut ugli::Framebuffer) {
         self.framebuffer_size = framebuffer.size();
-        ugli::clear(framebuffer, Some(Rgba::BLACK), None, None);
+        ugli::clear(
+            framebuffer,
+            Some(Rgba::try_from("#322214").unwrap()),
+            None,
+            None,
+        );
 
         if self.customize {
             self.geng
@@ -498,10 +503,19 @@ impl geng::State for Game {
             );
         }
 
+        let texture = &self.assets.sprites.table;
+        let size = texture.size().map(|x| x as f32);
+        let ratio = (self.bounds.height() / size.y).max(self.bounds.width() / size.x) * 1.5;
+        let size = size * ratio;
         self.geng.draw_2d(
             framebuffer,
             &self.camera,
-            &draw_2d::Quad::new(self.bounds, Rgba::new(0.1, 0.1, 0.1, 1.0)),
+            &draw_2d::TexturedQuad::new(AABB::ZERO.extend_symmetric(size * 0.5), texture),
+        );
+        self.geng.draw_2d(
+            framebuffer,
+            &self.camera,
+            &draw_2d::Quad::new(self.bounds, Rgba::new(0.1, 0.1, 0.1, 0.1)),
         );
 
         ugli::clear(framebuffer, None, Some(1.0), None);
