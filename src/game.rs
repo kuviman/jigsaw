@@ -554,8 +554,16 @@ impl geng::State for Game {
         match event {
             geng::Event::Wheel { delta } => {
                 const SENSITIVITY: f32 = 0.02;
+                let cursor_pos = self.geng.window().mouse_pos().map(|x| x as f32);
+                let old_world_pos = self
+                    .camera
+                    .screen_to_world(self.framebuffer_size.map(|x| x as f32), cursor_pos);
                 self.camera.fov =
                     (self.camera.fov - delta as f32 * SENSITIVITY).clamp(FOV_MIN, FOV_MAX);
+                let new_world_pos = self
+                    .camera
+                    .screen_to_world(self.framebuffer_size.map(|x| x as f32), cursor_pos);
+                self.camera.center += old_world_pos - new_world_pos;
             }
             geng::Event::MouseMove { position, .. } => {
                 self.update_cursor(position);
