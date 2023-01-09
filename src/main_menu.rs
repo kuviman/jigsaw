@@ -59,6 +59,12 @@ impl geng::State for ConfigScreen {
                         _ => unreachable!(),
                     };
                     info!("room: {:?}", room);
+                    #[cfg(target_arch = "wasm32")]
+                    web_sys::window()
+                        .unwrap()
+                        .location()
+                        .set_href(&format!("?room={}", room))
+                        .unwrap();
                     game::run(&geng, &addr, &room)
                 }
             };
