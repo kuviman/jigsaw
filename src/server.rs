@@ -38,16 +38,11 @@ struct State {
     rooms: Collection<Room>,
 }
 
-#[derive(Clone)]
-struct JigsawTile {
-    grabbed_by: Option<Id>,
-}
-
 #[derive(HasId)]
 struct Room {
     #[has_id(id)]
     name: String,
-    tiles: Vec<JigsawTile>,
+    tiles: Vec<TileState>,
     config: RoomConfig,
 }
 
@@ -69,9 +64,26 @@ impl State {
                     continue;
                 } else {
                     let player = self.players.get_mut(&id).unwrap();
+                    let mut rng = thread_rng();
+                    let bounds = AABB::ZERO.extend_uniform(3.0);
+                    let spawn_area = AABB::point(bounds.bottom_left())
+                        .extend_positive(vec2(bounds.width(), 3.0));
+                    let tiles = (0..config.size.x * config.size.y)
+                        .map(|_| {
+                            let pos = vec2(
+                                rng.gen_range(spawn_area.x_min..=spawn_area.x_max),
+                                rng.gen_range(spawn_area.y_min..=spawn_area.y_max),
+                            );
+                            TileState {
+                                grabbed_by: None,
+                                pos,
+                                connections: Vec::new(),
+                            }
+                        })
+                        .collect();
                     self.rooms.insert(Room {
                         name: name.clone(),
-                        tiles: vec![JigsawTile { grabbed_by: None }; config.size.x * config.size.y],
+                        tiles,
                         config,
                     });
                     player.sender.send(ServerMessage::RoomCreated(name));
@@ -79,9 +91,11 @@ impl State {
                 }
             },
             ClientMessage::UpdatePos(pos) => {
-                for player in &mut self.players {
-                    if player.id != id && player.room == room {
-                        player.sender.send(ServerMessage::UpdatePos(id, pos));
+                if let Some(room) = self.rooms.get_mut(&room) {
+                    for player in &mut self.players {
+                        if player.id != id && player.room == room.name {
+                            player.sender.send(ServerMessage::UpdatePos(id, pos));
+                        }
                     }
                 }
             }
@@ -100,9 +114,11 @@ impl State {
                 let mut messages = Vec::new();
                 if let Some(room) = self.rooms.get(&room) {
                     player.room = room.name.clone();
-                    player
-                        .sender
-                        .send(ServerMessage::SetupId(id, room.config.clone()));
+                    player.sender.send(ServerMessage::SetupId {
+                        player_id: id,
+                        room_config: room.config.clone(),
+                        tiles: room.tiles.clone(),
+                    });
                     for player in &self.players {
                         if player.id != id && player.room == room.name {
                             messages.push(ServerMessage::UpdatePlayerName(
@@ -140,28 +156,36 @@ impl State {
                     }
                 }
             }
-            ClientMessage::ReleaseTile(tile_id, pos) => {
+            ClientMessage::ReleaseTile(updates) => {
                 if let Some(room) = self.rooms.get_mut(&room) {
-                    if let Some(tile) = room.tiles.get_mut(tile_id) {
-                        if tile.grabbed_by.take() == Some(id) {
-                            for player in &mut self.players {
-                                if player.id != id && player.room == room.name {
-                                    player.sender.send(ServerMessage::TileReleased {
-                                        player: id,
-                                        tile: tile_id,
-                                        pos,
-                                    });
-                                }
+                    if let Some((tile_id, pos)) = updates.first().copied() {
+                        for player in &mut self.players {
+                            if player.id != id && player.room == room.name {
+                                player.sender.send(ServerMessage::TileReleased {
+                                    player: id,
+                                    tile: tile_id,
+                                    pos,
+                                });
                             }
+                        }
+                    }
+                    for (tile_id, pos) in updates {
+                        if let Some(tile) = room.tiles.get_mut(tile_id) {
+                            tile.grabbed_by.take();
+                            tile.pos = pos;
                         }
                     }
                 }
             }
             ClientMessage::ConnectTiles(a, b) => {
                 // TODO: check validity
-                for player in &mut self.players {
-                    if player.room == room {
-                        player.sender.send(ServerMessage::ConnectTiles(a, b));
+                if let Some(room) = self.rooms.get_mut(&room) {
+                    room.tiles[a].connections.push(b);
+                    room.tiles[b].connections.push(a);
+                    for player in &mut self.players {
+                        if player.room == room.name {
+                            player.sender.send(ServerMessage::ConnectTiles(a, b));
+                        }
                     }
                 }
             }

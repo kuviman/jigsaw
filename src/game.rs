@@ -55,6 +55,7 @@ impl Game {
         assets: &Rc<Assets>,
         id: Id,
         room_config: RoomConfig,
+        tiles: Vec<TileState>,
         mut connection: Connection,
     ) -> Self {
         let image = &assets.images[room_config.image];
@@ -62,18 +63,13 @@ impl Game {
         let size = size * 5.0 / size.y;
         let seed = room_config.seed;
         let mut jigsaw = Jigsaw::generate(geng.ugli(), seed, size, room_config.size);
-        let mut rng = rand::prelude::StdRng::seed_from_u64(seed);
         let bounds = AABB::ZERO.extend_symmetric(size / 2.0).extend_uniform(3.0);
-        let spawn_area =
-            AABB::point(bounds.bottom_left()).extend_positive(vec2(bounds.width(), 3.0));
-        for tile in &mut jigsaw.tiles {
+        for (tile, state) in jigsaw.tiles.iter_mut().zip(tiles) {
+            tile.grabbed_by = state.grabbed_by;
+            tile.connected_to = state.connections;
             tile.interpolated
                 .teleport(tile.interpolated.get() - size / 2.0, Vec2::ZERO);
-            let pos = vec2(
-                rng.gen_range(spawn_area.x_min..=spawn_area.x_max),
-                rng.gen_range(spawn_area.y_min..=spawn_area.y_max),
-            );
-            tile.interpolated.server_update(pos, Vec2::ZERO);
+            tile.interpolated.server_update(state.pos, Vec2::ZERO);
         }
         let my_player = Player {
             id,
@@ -127,7 +123,7 @@ impl Game {
     fn handle_connection(&mut self) {
         while let Some(message) = self.connection.try_recv() {
             match message {
-                ServerMessage::SetupId(..) => unreachable!(),
+                ServerMessage::SetupId { .. } => unreachable!(),
                 ServerMessage::RoomNotFound => unreachable!(),
                 ServerMessage::RoomCreated(..) => unreachable!(),
                 ServerMessage::UpdatePlayerName(id, name) => {
@@ -214,15 +210,17 @@ impl Game {
         let player = self.players.get_mut(&self.id).unwrap();
         if let Some((tile_id, _)) = player.tile_grabbed.take() {
             self.assets.sounds.grab.play();
+            let connected = self.jigsaw.get_all_connected(tile_id);
             self.connection.send(ClientMessage::ReleaseTile(
-                tile_id,
-                player.interpolation.get(),
+                connected
+                    .iter()
+                    .map(|&tile| (tile, self.jigsaw.tiles[tile].interpolated.get()))
+                    .collect(),
             ));
             let tile = self.jigsaw.tiles.get_mut(tile_id).unwrap();
             tile.grabbed_by = None;
 
             // Try to connect
-            let connected = self.jigsaw.get_all_connected(tile_id);
             for tile_id in connected {
                 let tile = self.jigsaw.tiles.get(tile_id).unwrap();
                 let pos = tile.interpolated.get();
@@ -610,9 +608,11 @@ pub fn run(geng: &Geng, addr: &str, room: &str) -> impl geng::State {
             let mut connection: game::Connection = connection.await;
             connection.send(ClientMessage::SelectRoom(room));
             match connection.next().await {
-                Some(ServerMessage::SetupId(id, room_config)) => {
-                    game::Game::new(&geng, &assets, id, room_config, connection)
-                }
+                Some(ServerMessage::SetupId {
+                    player_id,
+                    room_config,
+                    tiles,
+                }) => game::Game::new(&geng, &assets, player_id, room_config, tiles, connection),
                 Some(ServerMessage::RoomNotFound) => panic!("Room not found"),
                 _ => unreachable!(),
             }
