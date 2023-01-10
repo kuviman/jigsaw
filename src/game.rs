@@ -168,7 +168,7 @@ impl Game {
                     let vel = Some(player.interpolation.get_derivative());
                     self.jigsaw.tiles[tile].grabbed_by = None;
                     self.move_tile(tile, self.jigsaw.tiles[tile].interpolated.get(), vel, true);
-                    self.move_tile(tile, pos + offset, None, false);
+                    self.move_tile(tile, pos /*+ offset*/, None, false);
                 }
                 ServerMessage::ConnectTiles(a, b) => {
                     self.jigsaw.tiles[a].connected_to.push(b);
