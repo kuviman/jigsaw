@@ -244,7 +244,7 @@ impl Drop for Client {
         for player in &mut state.players {
             player
                 .sender
-                .send(ServerMessage::PlayerDisconnected(player.id));
+                .send(ServerMessage::PlayerDisconnected(self.id));
         }
     }
 }
